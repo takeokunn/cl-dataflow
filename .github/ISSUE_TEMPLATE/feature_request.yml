@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a small, composable addition that fits the dataflow core.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        cl-dataflow stays deliberately small. Please check the "Design Non-Goals"
+        section of the README before proposing new scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that the current API makes hard?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: Sketch the smallest public surface that would solve it.
+      render: lisp
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -1,0 +1,38 @@
+name: Bug report
+description: Report incorrect graph execution, state corruption, or unexpected behavior.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. A minimal reproduction makes fixes much faster.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and how it differs from what you expected.
+      placeholder: Running `run-pipeline` on ... produced ... but I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: The smallest snippet that reproduces the issue.
+      render: lisp
+    validations:
+      required: true
+  - type: input
+    id: implementation
+    attributes:
+      label: Common Lisp implementation and version
+      placeholder: SBCL 2.6.0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: cl-dataflow version or commit
+      placeholder: 0.1.0 / git SHA
+    validations:
+      required: true

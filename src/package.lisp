@@ -1,0 +1,179 @@
+(defpackage #:cl-dataflow
+  (:use #:cl)
+  (:export
+   #:cl-dataflow-error
+   #:invalid-input-error
+   #:invalid-input-expected
+   #:invalid-input-value
+   #:invalid-input-detail
+   #:graph-error
+   #:graph-error-graph
+   #:graph-error-detail
+   #:node-not-found-error
+   #:node-not-found-designator
+   #:graph-cycle-error
+   #:graph-cycle-nodes
+   #:effect-handler-missing-error
+   #:missing-effect-type
+   #:effect-handler-missing-effect
+   #:effect-handler-missing-detail
+   #:invalid-transition-error
+   #:invalid-transition-detail
+   #:invalid-transition-state
+   #:invalid-transition-event-type
+   #:guard-failed-error
+   #:guard-failed-detail
+   #:guard-failed-state
+   #:guard-failed-event-type
+   #:guard-failed-transition
+
+   #:node
+   #:node-p
+   #:node-name
+   #:node-inputs
+   #:node-outputs
+   #:node-handler
+   #:node-metadata
+   #:make-node
+
+   #:edge
+   #:edge-p
+   #:edge-from
+   #:edge-from-port
+   #:edge-to
+   #:edge-to-port
+   #:edge-metadata
+   #:make-edge
+
+   #:graph
+   #:graph-p
+   #:graph-nodes
+   #:graph-edges
+   #:graph-metadata
+   #:make-graph
+   #:copy-graph
+   #:copy-context
+   #:copy-event
+   #:copy-effect
+   #:add-node
+   #:add-edge
+   #:find-node
+   #:graph-source-nodes
+   #:graph-sink-nodes
+   #:validate-graph
+   #:topological-sort
+
+   #:context
+   #:context-p
+   #:context-values
+   #:context-events
+   #:context-events-in-order
+   #:context-event-types
+   #:context-events-of-type
+   #:context-effects
+   #:context-effects-in-order
+   #:context-effect-types
+   #:context-effects-of-type
+   #:context-trace
+   #:context-trace-in-order
+   #:context-last-event
+   #:context-last-effect
+   #:context-value
+   #:context-node-values
+   #:context-metadata
+   #:context-effect-handlers
+   #:context-result
+   #:context-state
+   #:make-context
+
+   #:event
+   #:event-p
+   #:event-type
+   #:event-payload
+   #:event-metadata
+   #:event-trace-index
+   #:make-event
+   #:emit-event
+
+   #:effect
+   #:effect-p
+   #:effect-type
+   #:effect-payload
+   #:effect-metadata
+   #:effect-trace-index
+   #:effect-result
+   #:make-effect
+   #:perform-effect
+
+   #:state-transition
+   #:state-transition-p
+   #:transition-from
+   #:transition-event-type
+   #:transition-to
+   #:transition-guard
+   #:transition-action
+   #:transition-metadata
+   #:make-transition
+   #:define-state-machine
+
+   #:state-machine
+   #:state-machine-p
+   #:state-machine-state
+   #:state-machine-initial-state
+   #:state-machine-transitions
+   #:state-machine-history
+   #:state-machine-metadata
+   #:make-state-machine
+   #:copy-state-machine
+   #:reset-state-machine
+   #:state-machine-last-transition
+   #:state-machine-available-transitions
+   #:state-machine-can-step-p
+   #:step-state-machine
+   #:run-state-machine
+   #:run-state-machine-with-context
+   #:make-state-machine-node
+
+   #:pipeline
+   #:pipeline-p
+   #:pipeline-graph
+   #:pipeline-stages
+   #:pipeline-metadata
+   #:make-pipeline
+   #:define-pipeline
+   #:define-workflow
+   #:copy-pipeline
+   #:run-pipeline
+   #:run-pipeline-with-context
+
+   #:flow-name
+   #:flow-metadata
+   #:flow-kind
+
+   #:run-pipeline-with-test-context
+   #:assert-emitted-events
+   #:assert-performed-effects
+   #:assert-final-state
+   #:assert-state-machine-state
+   #:assert-pipeline-result))
+
+(in-package #:cl-dataflow)
+
+(defmacro %load-fragment (pathname)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (let* ((source-path (merge-pathnames ,pathname
+                                          (or *load-truename*
+                                              *compile-file-truename*)))
+            (fasl-path (compile-file-pathname source-path))
+            (source-date (file-write-date source-path))
+            (fasl-date (and (probe-file fasl-path)
+                            (file-write-date fasl-path))))
+        (when (or (null fasl-date)
+                  (> source-date fasl-date))
+          (compile-file source-path :output-file fasl-path))
+        (if (and (probe-file fasl-path)
+                 (plusp (with-open-file (stream fasl-path :direction :input
+                                                :element-type '(unsigned-byte 8))
+                          (file-length stream))))
+            (load fasl-path)
+            (load source-path)))))

@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Portability matrix: load and test the system across Common Lisp
+  # implementations using Roswell. cl-dataflow depends only on the ANSI
+  # standard plus ASDF/UIOP, so it should stay green everywhere.
+  test:
+    name: test (${{ matrix.lisp }} / ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        lisp: [sbcl-bin, ccl-bin, ecl]
+        include:
+          - os: ubuntu-latest
+            lisp: abcl-bin
+    runs-on: ${{ matrix.os }}
+    env:
+      LISP: ${{ matrix.lisp }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: 40ants/setup-lisp@v4
+        with:
+          asdf-system: cl-dataflow
+      - name: Run test suite
+        shell: bash
+        run: |
+          ros -e '(push (uiop:getcwd) asdf:*central-registry*)' \
+              -e '(handler-case (asdf:test-system :cl-dataflow)
+                    (serious-condition (c)
+                      (format *error-output* "~&~A~%" c)
+                      (uiop:quit 1)))' \
+              -e '(uiop:quit 0)'
+
+  # Reproduce the documented developer workflow verbatim with a system SBCL:
+  # this exercises scripts/verify.sh, including the example smoke tests.
+  verify:
+    name: verify.sh (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SBCL (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y sbcl
+      - name: Install SBCL (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sbcl
+      - name: Run verification script
+        run: ./scripts/verify.sh
+
+  # Publish an sb-cover HTML report so reviewers can inspect coverage trends.
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SBCL
+        run: sudo apt-get update && sudo apt-get install -y sbcl
+      - name: Generate coverage report
+        run: ./scripts/coverage.sh
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/sb-cover/
+          if-no-files-found: error

@@ -1,0 +1,33 @@
+# Compiled Common Lisp artifacts
+*.fasl
+*.fas
+*.lx64fsl
+*.lx32fsl
+*.dx64fsl
+*.dx32fsl
+*.wx64fsl
+*.wx32fsl
+*.abcl
+*.o
+*.so
+*.dylib
+
+# ASDF / build output
+.cache/
+build/
+system-index.txt
+
+# Coverage reports (regenerate with scripts/coverage.sh)
+/coverage/
+
+# Saved images / cores
+*.core
+*.image
+
+# Editor and OS cruft
+*~
+\#*\#
+.\#*
+.DS_Store
+*.swp
+*.swo
