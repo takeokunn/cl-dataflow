@@ -1,84 +1,73 @@
 name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
-
-# Cancel superseded runs on the same ref to save CI minutes.
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # Portability matrix: load and test the system across Common Lisp
-  # implementations using Roswell. cl-dataflow depends only on the ANSI
-  # standard plus ASDF/UIOP, so it should stay green everywhere.
-  test:
-    name: test (${{ matrix.lisp }} / ${{ matrix.os }})
+  nix:
+    name: nix (${{ matrix.system }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        lisp: [sbcl-bin, ccl-bin, ecl]
         include:
           - os: ubuntu-latest
-            lisp: abcl-bin
-    runs-on: ${{ matrix.os }}
-    env:
-      LISP: ${{ matrix.lisp }}
+            system: x86_64-linux
+          - os: macos-14
+            system: aarch64-darwin
     steps:
-      - uses: actions/checkout@v4
-      - uses: 40ants/setup-lisp@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
         with:
-          asdf-system: cl-dataflow
-      - name: Run test suite
-        shell: bash
-        run: |
-          ros -e '(push (uiop:getcwd) asdf:*central-registry*)' \
-              -e '(handler-case (asdf:test-system :cl-dataflow)
-                    (serious-condition (c)
-                      (format *error-output* "~&~A~%" c)
-                      (uiop:quit 1)))' \
-              -e '(uiop:quit 0)'
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-  # Reproduce the documented developer workflow verbatim with a system SBCL:
-  # this exercises scripts/verify.sh, including the example smoke tests.
-  verify:
-    name: verify.sh (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install SBCL (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y sbcl
-      - name: Install SBCL (macOS)
-        if: runner.os == 'macOS'
-        run: brew install sbcl
-      - name: Run verification script
-        run: ./scripts/verify.sh
+      - name: Configure Cachix (pull-only)
+        if: ${{ env.CACHIX_CACHE != '' && env.CACHIX_AUTH_TOKEN == '' }}
+        uses: cachix/cachix-action@v17
+        with:
+          name: ${{ env.CACHIX_CACHE }}
+          extraPullNames: nix-community
+          skipPush: true
 
-  # Publish an sb-cover HTML report so reviewers can inspect coverage trends.
-  coverage:
-    name: coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install SBCL
-        run: sudo apt-get update && sudo apt-get install -y sbcl
-      - name: Generate coverage report
-        run: ./scripts/coverage.sh
-      - name: Upload coverage report
+      - name: Configure Cachix (push-enabled)
+        if: ${{ env.CACHIX_CACHE != '' && env.CACHIX_AUTH_TOKEN != '' }}
+        uses: cachix/cachix-action@v17
+        with:
+          name: ${{ env.CACHIX_CACHE }}
+          authToken: ${{ env.CACHIX_AUTH_TOKEN }}
+          extraPullNames: nix-community
+
+      - name: Run flake checks
+        run: perl -e 'alarm 900; exec @ARGV' -- nix flake check --print-build-logs
+
+      - name: Build coverage artifact
+        run: nix build .#checks.${{ matrix.system }}.coverage --print-build-logs
+
+      - name: Export coverage artifact
+        run: cp -R result/ coverage-artifact/
+
+      - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: coverage/sb-cover/
+          name: cl-dataflow-coverage-${{ matrix.system }}
+          path: coverage-artifact/
           if-no-files-found: error

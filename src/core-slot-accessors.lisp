@@ -64,54 +64,56 @@
 
 (defmacro define-type-predicates (&body specs)
   `(progn
-     ,@(mapcar (lambda (spec)
-                 (destructuring-bind (predicate-name type-name) spec
-                   `(defun ,predicate-name (object)
+      ,@(mapcar (lambda (spec)
+                  (destructuring-bind (predicate-name type-name) spec
+                    `(defun ,predicate-name (object)
                       (typep object ',type-name))))
-               specs)))
+                specs)))
 
 (defun %slot-api-clause-forms (clause)
   (destructuring-bind (kind name object-name slot-name &rest args) clause
     (ecase kind
       (:read-only
-       (list `(defun ,name (,object-name)
+        (list `(defun ,name (,object-name)
                 (slot-value ,object-name ',slot-name))))
       (:copy
-       (destructuring-bind (&optional (copy-form '%copy-structured-value)) args
-         (list `(defun ,name (,object-name)
+        (destructuring-bind (&optional (copy-form '%copy-structured-value)) args
+          (list `(defun ,name (,object-name)
                   (,copy-form (slot-value ,object-name ',slot-name)))
-               `(defun (setf ,name) (value ,object-name)
+                `(defun (setf ,name) (value ,object-name)
                   (setf (slot-value ,object-name ',slot-name)
                         (,copy-form value))))))
       (:mapcar-copy
-       (destructuring-bind (copier-name) args
-         (list `(defun ,name (,object-name)
+        (destructuring-bind (copier-name) args
+          (list `(defun ,name (,object-name)
                   (mapcar #',copier-name
                           (slot-value ,object-name ',slot-name)))
-               `(defun (setf ,name) (value ,object-name)
+                `(defun (setf ,name) (value ,object-name)
                   (setf (slot-value ,object-name ',slot-name)
                         (mapcar #',copier-name value))))))
       (:setter-transform
-       (destructuring-bind (transform-form) args
-         (list `(defun (setf ,name) (value ,object-name)
+        (destructuring-bind (transform-form) args
+          (list `(defun ,name (,object-name)
+                  (slot-value ,object-name ',slot-name))
+                `(defun (setf ,name) (value ,object-name)
                   (setf (slot-value ,object-name ',slot-name)
                         (,transform-form value))))))
       (:transform
-       (destructuring-bind (getter-form setter-form) args
-         (list `(defun ,name (,object-name)
+        (destructuring-bind (getter-form setter-form) args
+          (list `(defun ,name (,object-name)
                   ,getter-form)
-               `(defun (setf ,name) (value ,object-name)
+                `(defun (setf ,name) (value ,object-name)
                   (setf (slot-value ,object-name ',slot-name)
                         ,setter-form))))))))
 
 (defmacro define-slot-apis (&body clauses)
   `(progn
-     ,@(mapcan #'%slot-api-clause-forms clauses)))
+      ,@(mapcan #'%slot-api-clause-forms clauses)))
 
 (defun %hash-table-keys (table)
   (let (keys)
     (maphash (lambda (key value)
-               (declare (ignore value))
-               (push key keys))
-             table)
+                (declare (ignore value))
+                (push key keys))
+              table)
     (nreverse keys)))

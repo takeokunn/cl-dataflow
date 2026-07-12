@@ -26,7 +26,8 @@
 
 ## Install
 
-Place the checkout in a location ASDF can see, then load the system:
+Place this checkout and `cl-prolog` in locations ASDF can see, then load the
+system. The test system additionally requires `cl-weave`.
 
 ```lisp
 (asdf:load-system :cl-dataflow)
@@ -45,6 +46,15 @@ Then load it from Quicklisp:
 ```
 
 Or register the repository directory in `asdf:*central-registry*` before loading.
+
+The flake pins all dependencies and provides the reproducible development
+environment:
+
+```bash
+nix develop
+nix run
+nix flake check
+```
 
 ## Quick Start
 
@@ -86,7 +96,7 @@ Or register the repository directory in `asdf:*central-registry*` before loading
 - Predicates: `node-p`, `edge-p`, `graph-p`, `context-p`, `event-p`, `effect-p`, `state-transition-p`, `state-machine-p`, `pipeline-p`
 - Node APIs: `node-name`, `node-inputs`, `node-outputs`, `node-handler`, `node-metadata`, `make-node`
 - Edge APIs: `edge-from`, `edge-from-port`, `edge-to`, `edge-to-port`, `edge-metadata`, `make-edge`
-- Graph APIs: `graph-nodes`, `graph-edges`, `graph-metadata`, `make-graph`, `copy-graph`, `add-node`, `add-edge`, `find-node`, `graph-source-nodes`, `graph-sink-nodes`, `validate-graph`, `topological-sort`
+- Graph APIs: `graph-nodes`, `graph-edges`, `graph-metadata`, `make-graph`, `copy-graph`, `add-node`, `add-edge`, `find-node`, `graph-source-nodes`, `graph-sink-nodes`, `graph-reachable-p`, `validate-graph`, `topological-sort`
 - Context APIs: `make-context`, `copy-context`, `context-values`, `context-value`, `context-node-values`, `context-events`, `context-events-in-order`, `context-event-types`, `context-events-of-type`, `context-effects`, `context-effects-in-order`, `context-effect-types`, `context-effects-of-type`, `context-trace`, `context-trace-in-order`, `context-last-event`, `context-last-effect`, `context-metadata`, `context-effect-handlers`, `context-result`, `context-state`
 - Event APIs: `make-event`, `copy-event`, `emit-event`, `event-type`, `event-payload`, `event-metadata`, `event-trace-index`
 - Effect APIs: `make-effect`, `copy-effect`, `perform-effect`, `effect-type`, `effect-payload`, `effect-metadata`, `effect-trace-index`, `effect-result`
@@ -183,17 +193,19 @@ Expected outputs:
 ## Testing
 
 The test ASDF system is `cl-dataflow/test`. `asdf:test-system :cl-dataflow`
-dispatches to it.
+dispatches to the cl-weave suite. The suite dogfoods cl-weave property tests
+and custom matchers for generated graph invariants.
 
 ```bash
-asdf:test-system :cl-dataflow
+nix run
+nix flake check
 ```
 
 The current verification commands are:
 
 ```bash
 ./scripts/verify.sh
-sbcl --noinform --eval '(require :asdf)' --eval '(progn (push #P"./" asdf:*central-registry*) (asdf:test-system :cl-dataflow) (quit))'
+nix build .#checks.$(nix eval --impure --raw --expr builtins.currentSystem).coverage
 sbcl --script examples/simple-pipeline.lisp
 sbcl --script examples/event-workflow.lisp
 sbcl --script examples/state-machine.lisp

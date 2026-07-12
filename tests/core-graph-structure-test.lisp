@@ -4,40 +4,52 @@
   (with-graph-fixture (graph ((source "source")
                               (middle "middle")
                               (sink "sink"))
-                       :edges ((source middle)
-                               (middle sink)))
+                        :edges ((source middle)
+                                (middle sink)))
     (assert-node-order (topological-sort graph)
-                       '("source" "middle" "sink"))
+                        '("source" "middle" "sink"))
     (is (validate-graph graph))))
 
 (deftest topological-sort-is-stable-for-independent-sources
   (with-graph-fixture (graph ((beta "beta")
                               (alpha "alpha")
                               (sink "sink"))
-                       :edges ((beta sink)
-                               (alpha sink)))
+                        :edges ((beta sink)
+                                (alpha sink)))
     (assert-node-order (topological-sort graph)
-                       '("alpha" "beta" "sink"))
+                        '("alpha" "beta" "sink"))
     (assert-node-order (graph-source-nodes graph)
-                       '("alpha" "beta"))
+                        '("alpha" "beta"))
     (assert-node-order (graph-sink-nodes graph)
-                       '("sink"))))
+                        '("sink"))))
 
 (deftest graph-sink-nodes-are-stable-for-independent-sinks
   (with-graph-fixture (graph ((source "source")
                               (beta "beta")
                               (alpha "alpha"))
-                       :edges ((source beta)
-                               (source alpha)))
+                        :edges ((source beta)
+                                (source alpha)))
     (assert-node-order (graph-sink-nodes graph)
-                       '("alpha" "beta"))
+                        '("alpha" "beta"))
     (assert-node-order (topological-sort graph)
-                       '("source" "alpha" "beta"))))
+                        '("source" "alpha" "beta"))))
+
+(deftest graph-reachability-is-backed-by-transitive-prolog-queries
+  (with-graph-fixture (graph ((source "source")
+                              (middle "middle")
+                              (sink "sink")
+                              (isolated "isolated"))
+                        :edges ((source middle)
+                                (middle sink)))
+    (is (graph-reachable-p graph source sink))
+    (is (graph-reachable-p graph source middle))
+    (is (not (graph-reachable-p graph sink source)))
+    (is (not (graph-reachable-p graph source isolated)))))
 
 (deftest graph-source-and-sink-nodes-return-copy-snapshots
   (with-graph-fixture (graph ((source "source" :metadata '((:kind :source)))
                               (sink "sink" :metadata '((:kind :sink))))
-                       :edges ((source sink)))
+                        :edges ((source sink)))
     (let ((sources (graph-source-nodes graph))
           (sinks (graph-sink-nodes graph)))
       (is (not (eq (first sources) (find-node graph "source"))))
@@ -45,29 +57,29 @@
       (setf (node-metadata (first sources)) '((:kind :mutated-source))
             (node-metadata (first sinks)) '((:kind :mutated-sink)))
       (is (equal (node-metadata (find-node graph "source"))
-                 '((:kind :source))))
+                  '((:kind :source))))
       (is (equal (node-metadata (find-node graph "sink"))
-                 '((:kind :sink)))))))
+                  '((:kind :sink)))))))
 
 (deftest graph-cycle-detection
   (with-graph-fixture (graph ((a "a")
                               (b "b"))
-                       :edges ((a b)
-                               (b a)))
+                        :edges ((a b)
+                                (b a)))
     (signals graph-cycle-error
       (topological-sort graph))))
 
 (deftest graph-cycle-error-exposes-cyclic-nodes
   (with-graph-fixture (graph ((a "a")
                               (b "b"))
-                       :edges ((a b)
-                               (b a)))
+                        :edges ((a b)
+                                (b a)))
     (let ((captured
             (capture-condition (condition graph-cycle-error)
               (topological-sort graph))))
       (is captured)
       (assert-node-order (graph-cycle-nodes captured)
-                         '("a" "b"))
+                          '("a" "b"))
       (assert-graph-condition captured
                               graph
                               "Graph contains a cycle or disconnected cycle component."
@@ -76,12 +88,12 @@
 
 (deftest graph-cycle-error-report-omits-node-list-when-empty
   (let* ((graph (make-graph))
-         (captured (make-condition 'graph-cycle-error
-                                   :graph graph
-                                   :nodes '()
-                                   :detail "Graph contains a cycle or disconnected cycle component.")))
+          (captured (make-condition 'graph-cycle-error
+                                    :graph graph
+                                    :nodes '()
+                                    :detail "Graph contains a cycle or disconnected cycle component.")))
     (assert-condition-report captured
-                             "Graph contains a cycle or disconnected cycle component.")))
+                              "Graph contains a cycle or disconnected cycle component.")))
 
 (deftest missing-node-rejected-on-edge-addition
   (with-graph-fixture (graph ((node "only")))
@@ -97,14 +109,14 @@
 
 (deftest add-node-rejects-non-node-designators-with-condition-data
   (let* ((graph (make-graph))
-         (captured
-           (capture-condition (condition invalid-input-error)
-             (add-node graph "missing-node"))))
+          (captured
+            (capture-condition (condition invalid-input-error)
+              (add-node graph "missing-node"))))
     (is captured)
     (is (equal (invalid-input-expected captured) 'node))
     (is (equal (invalid-input-value captured) "missing-node"))
     (is (equal (invalid-input-detail captured)
-               "Expected NODE, got \"missing-node\""))
+                "Expected NODE, got \"missing-node\""))
     (is (typep captured 'cl-dataflow-error))))
 
 (deftest add-node-rejects-duplicate-node-names
@@ -116,17 +128,17 @@
       (assert-graph-condition captured
                               graph
                               "Node already exists: source"
-                              :type 'graph-error)))
+                              :type 'graph-error))))
 
 (deftest add-edge-rejects-duplicate-edge-definitions
   (with-graph-fixture (graph ((source "source" :outputs '("left"))
                               (sink "sink" :inputs '("right")))
-                       :edges ((source sink :from-port "left" :to-port "right")))
+                        :edges ((source sink :from-port "left" :to-port "right")))
     (let ((captured
             (handler-case
                 (add-edge graph source sink :from-port "left" :to-port "right")
               (graph-error (condition)
-                condition)))))
+                condition))))
       (is captured)
       (assert-graph-condition captured
                               graph
@@ -153,10 +165,10 @@
                               (sink "sink" :inputs '("right"))))
     (setf (graph-edges graph)
           (list (make-instance 'edge
-                               :from (node-name source)
-                               :from-port "missing"
-                               :to (node-name sink)
-                               :to-port "right")))
+                                :from (node-name source)
+                                :from-port "missing"
+                                :to (node-name sink)
+                                :to-port "right")))
     (signals graph-error
       (validate-graph graph))))
 
@@ -164,14 +176,14 @@
   (let ((graph (make-graph)))
     (signals graph-error
       (add-node graph (make-instance 'node
-                                     :name "source"
-                                     :inputs '("dup" "dup")
-                                     :outputs '("ok"))))
+                                      :name "source"
+                                      :inputs '("dup" "dup")
+                                      :outputs '("ok"))))
     (signals graph-error
       (add-node graph (make-instance 'node
-                                     :name "source"
-                                     :inputs '("ok")
-                                     :outputs '("dup" "dup"))))))
+                                      :name "source"
+                                      :inputs '("ok")
+                                      :outputs '("dup" "dup"))))))
 
 (deftest graph-error-accessors-expose-condition-data
   (with-graph-fixture (graph ((source "source" :outputs '("left"))
@@ -192,9 +204,9 @@
 (deftest graph-validation-rejects-malformed-node-port-lists
   (let ((graph (make-graph))
         (node (make-instance 'node
-                             :name "source"
-                             :inputs '("ok")
-                             :outputs '("dup" "dup"))))
+                              :name "source"
+                              :inputs '("ok")
+                              :outputs '("dup" "dup"))))
     (setf (gethash (node-name node) (slot-value graph 'cl-dataflow::nodes)) node)
     (signals graph-error
       (validate-graph graph))))
@@ -203,10 +215,10 @@
   (with-graph-fixture (graph ((source "source")))
     (setf (graph-edges graph)
           (list (make-instance 'edge
-                               :from "source"
-                               :from-port "value"
-                               :to "missing"
-                               :to-port "value")))
+                                :from "source"
+                                :from-port "value"
+                                :to "missing"
+                                :to-port "value")))
     (let ((captured nil))
       (handler-case
           (topological-sort graph)
@@ -236,7 +248,7 @@
 
 (deftest invalid-input-errors-copy-mutable-designators
   (let* ((designator (list :missing "node"))
-         (captured nil))
+          (captured nil))
     (handler-case
         (add-node (make-graph) designator)
       (invalid-input-error (condition)
@@ -246,4 +258,4 @@
     (setf (second designator) "changed")
     (is (equal (invalid-input-value captured) '(:missing "node")))
     (is (equal (invalid-input-detail captured)
-               "Expected NODE, got (:MISSING \"node\")"))))
+                "Expected NODE, got (:MISSING \"node\")"))))

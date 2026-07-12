@@ -12,16 +12,17 @@ helpers, all behind a single public package."
   :homepage "https://github.com/takeokunn/cl-dataflow"
   :source-control (:git "https://github.com/takeokunn/cl-dataflow.git")
   :bug-tracker "https://github.com/takeokunn/cl-dataflow/issues"
+  :depends-on (#:cl-prolog)
   :serial t
   :pathname "src/"
   :components ((:file "package")
-               (:file "core")
-               (:file "protocols")
-               (:file "events")
-               (:file "effects")
-               (:file "state-machine")
-               (:file "pipeline")
-               (:file "testing"))
+                (:file "core")
+                (:file "protocols")
+                (:file "events")
+                (:file "effects")
+                (:file "state-machine")
+                (:file "pipeline")
+                (:file "testing"))
   :in-order-to ((test-op (test-op "cl-dataflow/test"))))
 
 (asdf:defsystem #:cl-dataflow/test
@@ -31,14 +32,16 @@ helpers, all behind a single public package."
   :license "MIT"
   :version "0.1.0"
   :homepage "https://github.com/takeokunn/cl-dataflow"
-  :depends-on (#:cl-dataflow)
+  :depends-on (#:cl-dataflow
+                #:cl-weave)
   :serial t
   :pathname "tests/"
   :components ((:file "package")
-               (:file "core-test")
-               (:file "events-test")
-               (:file "state-machine-test")
-               (:file "effects-test")
-               (:file "pipeline-test"))
+                (:file "core-test")
+                (:file "events-test")
+                (:file "state-machine-test")
+                (:file "effects-test")
+                (:file "pipeline-test")
+                (:file "cl-weave-advanced-test"))
   :perform (test-op (o c)
     (uiop:symbol-call '#:cl-dataflow.test '#:run-tests)))
