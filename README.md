@@ -196,6 +196,10 @@ The test ASDF system is `cl-dataflow/test`. `asdf:test-system :cl-dataflow`
 dispatches to the cl-weave suite. The suite dogfoods cl-weave property tests
 and custom matchers for generated graph invariants.
 
+GitHub Actions runs the CI workflow on `ubuntu-latest` only. Pull requests run
+the same `nix flake check` and coverage build as local verification, and the
+workflow uploads the generated coverage report as an artifact.
+
 ```bash
 nix run
 nix flake check
