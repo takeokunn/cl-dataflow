@@ -201,6 +201,13 @@ nix run
 nix flake check
 ```
 
+Coverage is measured only for source files owned by the `cl-dataflow` ASDF
+system. The coverage check requires at least 84% expression coverage and 100%
+branch coverage; falling below either threshold fails the command. Run the same
+gate locally with `./scripts/coverage.sh`. The output paths and thresholds can
+be overridden with `COVERAGE_OUTPUT`, `COVERAGE_REPORT_DIR`,
+`COVERAGE_MIN_EXPRESSION`, and `COVERAGE_MIN_BRANCH`.
+
 The current verification commands are:
 
 ```bash

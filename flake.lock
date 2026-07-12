@@ -56,11 +56,11 @@
         "paredit-cli": "paredit-cli_2"
       },
       "locked": {
-        "lastModified": 1783865310,
-        "narHash": "sha256-dY1my0YFdr+UrT6Nt50SfmI6rgHwoBvUZO39Xpad0GE=",
+        "lastModified": 1783868526,
+        "narHash": "sha256-7WsmsgAiE9WfkQal5UkgkiNyqruO7jDCS4dNQXkBw6A=",
         "owner": "takeokunn",
         "repo": "cl-weave",
-        "rev": "08d092f403701bf6bafd0a2509e1e879894e007a",
+        "rev": "9d40fb96d1bde7b6a6fe0df15cdfb95db5f9f054",
         "type": "github"
       },
       "original": {
