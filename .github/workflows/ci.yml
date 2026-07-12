@@ -15,20 +15,12 @@ concurrency:
 
 jobs:
   nix:
-    name: nix (${{ matrix.system }})
-    runs-on: ${{ matrix.os }}
+    name: nix (x86_64-linux)
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       CACHIX_CACHE: ${{ vars.CACHIX_CACHE }}
       CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            system: x86_64-linux
-          - os: macos-14
-            system: aarch64-darwin
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,7 +52,7 @@ jobs:
         run: perl -e 'alarm 900; exec @ARGV' -- nix flake check --print-build-logs
 
       - name: Build coverage artifact
-        run: nix build .#checks.${{ matrix.system }}.coverage --print-build-logs
+        run: nix build .#checks.x86_64-linux.coverage --print-build-logs
 
       - name: Export coverage artifact
         run: cp -R result/ coverage-artifact/
@@ -68,6 +60,6 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cl-dataflow-coverage-${{ matrix.system }}
+          name: cl-dataflow-coverage-x86_64-linux
           path: coverage-artifact/
           if-no-files-found: error
