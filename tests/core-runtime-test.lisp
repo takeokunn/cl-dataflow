@@ -8,6 +8,28 @@
 
 (define-public-api-contract-test public-api-exports-match-documentation
   "CL-DATAFLOW"
+  (:classes
+    (cl-dataflow-error
+      invalid-input-error
+      graph-error
+      node-not-found-error
+      graph-cycle-error
+      effect-handler-missing-error
+      invalid-transition-error
+      guard-failed-error
+      node
+      edge
+      graph
+      context
+      event
+      effect
+      state-transition
+      state-machine
+      pipeline)
+    :macros
+    (define-state-machine
+      define-pipeline
+      define-workflow))
   (:errors
     cl-dataflow-error
     invalid-input-error

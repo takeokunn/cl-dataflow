@@ -34,7 +34,7 @@
     (assert-node-order (topological-sort graph)
                         '("source" "alpha" "beta"))))
 
-(deftest graph-reachability-is-backed-by-transitive-prolog-queries
+(deftest graph-reachability-uses-prolog-successor-queries-for-transitive-search
   (with-graph-fixture (graph ((source "source")
                               (middle "middle")
                               (sink "sink")

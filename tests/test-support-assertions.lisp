@@ -215,7 +215,20 @@
         (is (equal (guard-failed-detail ,condition) ,expected-detail))
         (assert-condition-report ,condition ,expected-detail)))))
 
-(defmacro define-public-api-contract-test (name package-name &body groups)
+(defun %public-api-symbol-defined-p (symbol kind)
+  (ecase kind
+    (:function
+      (and (fboundp symbol)
+          (null (macro-function symbol))))
+    (:macro
+      (not (null (macro-function symbol))))
+    (:class
+      (not (null (find-class symbol nil))))
+    (:variable
+      (boundp symbol))))
+
+(defmacro define-public-api-contract-test
+    (name package-name (&key classes macros variables) &body groups)
   (let ((documented-symbols
           (loop for group in groups
                 append (rest group))))
@@ -224,11 +237,30 @@
               (expected (%sorted-symbol-names ',documented-symbols))
               (actual (%sorted-symbol-names
                         (loop for symbol being the external-symbols of package
-                              collect symbol))))
+                              collect symbol)))
+              (classified-symbols
+                (append ',classes ',macros ',variables))
+              (duplicate-classifications
+                (loop for symbol in classified-symbols
+                      when (> (count symbol classified-symbols) 1)
+                        collect symbol)))
           (is package)
           (is (equal actual expected)
               (format nil
                       "Package ~A export surface drifted.~%Expected: ~S~%Actual: ~S"
                       ,package-name
                       expected
-                      actual))))))
+                      actual))
+          (is (null duplicate-classifications)
+              (format nil "Public API symbols have duplicate classifications: ~S"
+                      duplicate-classifications))
+          (dolist (symbol ',documented-symbols)
+            (let ((kind (cond
+                          ((member symbol ',classes) :class)
+                          ((member symbol ',macros) :macro)
+                          ((member symbol ',variables) :variable)
+                          (t :function))))
+              (is (%public-api-symbol-defined-p symbol kind)
+                  (format nil "Public API symbol ~S is not defined as a ~A."
+                          symbol
+                          kind))))))))
