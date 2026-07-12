@@ -37,24 +37,17 @@
     (is (= 1 (length (state-machine-history idle))))
     (let ((trace (context-trace context)))
       (is (= 4 (length trace)))
-      (let ((sink-entry (first trace))
-            (controller-entry (second trace))
-            (transition-entry (third trace))
-            (source-entry (fourth trace)))
-        (assert-plist-entry sink-entry
-          (:node "sink")
-          (:input "running"))
-        (assert-plist-entry controller-entry
-          (:node "controller")
-          (:input "start"))
-        (assert-plist-entry transition-entry
-          (:from "idle")
-          (:event-type "start")
-          (:to "running")
-          (:guard-passed t))
-        (assert-plist-entry source-entry
-          (:node "source")
-          (:input "start"))))))
+      (assert-context-trace-entries context
+        (0 (:node "sink")
+           (:input "running"))
+        (1 (:node "controller")
+           (:input "start"))
+        (2 (:from "idle")
+           (:event-type "start")
+           (:to "running")
+           (:guard-passed t))
+        (3 (:node "source")
+           (:input "start"))))))
 
 (deftest state-machine-node-supports-event-and-result-fns
   (let* ((calls '())
@@ -137,29 +130,29 @@
                                                                 1))))))
     (is (state-machine-can-step-p machine "start"))))
 
-(deftest state-machine-transitions-return-independent-snapshots
-  (let* ((transition (make-transition "idle" "start" "running"
-                                      :metadata '((:labels "alpha"))))
-         (machine (make-state-machine
-                   :state "idle"
-                   :transitions (list transition)))
-         (snapshot (first (state-machine-transitions machine))))
-    (is (not (eq snapshot transition)))
-    (setf (transition-metadata snapshot) '((:labels "mutated")))
-    (is (equal (transition-metadata (first (state-machine-transitions machine)))
-               '((:labels "alpha"))))))
+(define-snapshot-isolation-test state-machine-transitions-return-independent-snapshots
+  ((transition (make-transition "idle" "start" "running"
+                                 :metadata '((:labels "alpha"))))
+   (machine (make-state-machine
+             :state "idle"
+             :transitions (list transition))))
+  (snapshot (first (state-machine-transitions machine)))
+  (is (not (eq snapshot transition)))
+  (setf (transition-metadata snapshot) '((:labels "mutated")))
+  (is (equal (transition-metadata (first (state-machine-transitions machine)))
+             '((:labels "alpha")))))
 
-(deftest state-machine-available-transitions-return-independent-snapshots
-  (let* ((transition (make-transition "idle" "start" "running"
-                                      :metadata '((:labels "alpha"))))
-         (machine (make-state-machine
-                   :state "idle"
-                   :transitions (list transition)))
-         (snapshot (first (state-machine-available-transitions machine))))
-    (is (not (eq snapshot transition)))
-    (setf (transition-metadata snapshot) '((:labels "mutated")))
-    (is (equal (transition-metadata (first (state-machine-available-transitions machine)))
-               '((:labels "alpha"))))))
+(define-snapshot-isolation-test state-machine-available-transitions-return-independent-snapshots
+  ((transition (make-transition "idle" "start" "running"
+                                 :metadata '((:labels "alpha"))))
+   (machine (make-state-machine
+             :state "idle"
+             :transitions (list transition))))
+  (snapshot (first (state-machine-available-transitions machine)))
+  (is (not (eq snapshot transition)))
+  (setf (transition-metadata snapshot) '((:labels "mutated")))
+  (is (equal (transition-metadata (first (state-machine-available-transitions machine)))
+             '((:labels "alpha")))))
 
 (deftest state-machine-available-transitions-normalizes-state-designator
   (let ((machine (make-state-machine

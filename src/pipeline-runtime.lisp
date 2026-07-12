@@ -43,21 +43,30 @@
                   (%copy-structured-value (cdr binding))))
           bindings))
 
+(defun %make-node-trace-record (node node-input bindings)
+  (list :node (node-name node)
+        :input node-input
+        :output (%copy-node-output-bindings bindings)))
+
+(defun %record-node-run (context node node-input bindings)
+  (dolist (binding bindings)
+    (%store-value context (node-name node) (car binding) (cdr binding)))
+  (push (%make-node-trace-record node node-input bindings)
+        (%context-trace-list context)))
+
 (defun %run-node/cps (context graph node input continuation)
   (let* ((node-input (%collect-node-inputs context graph node input))
          (output (funcall (node-handler node) node-input context))
          (bindings (%node-output-bindings node output)))
-    (dolist (binding bindings)
-      (%store-value context (node-name node) (car binding) (cdr binding)))
-    (push (list :node (node-name node)
-                :input node-input
-                :output (%copy-node-output-bindings bindings))
-          (%context-trace-list context))
+    (%record-node-run context node node-input bindings)
     (funcall continuation output)))
 
 (defun %finalize-pipeline-run (graph context order)
   (setf (context-result context) (%collect-sink-results graph context order))
   (context-result context))
+
+(defun %ensure-pipeline-context (context)
+  (or context (make-context)))
 
 (defun %run-pipeline-stages/cps (context graph order input continuation)
   (labels ((advance-stages (remaining)
@@ -74,13 +83,13 @@
 
 (defun run-pipeline (pipeline &key input context)
   (let* ((graph (pipeline-graph pipeline))
-         (ctx (or context (make-context)))
+         (ctx (%ensure-pipeline-context context))
          (order (%remap-pipeline-stages graph (pipeline-stages pipeline))))
     (%run-pipeline-stages/cps ctx graph order input
                               (lambda (result)
                                 result))))
 
 (defun run-pipeline-with-context (pipeline &key input context)
-  (let ((ctx (or context (make-context))))
+  (let ((ctx (%ensure-pipeline-context context)))
     (values (run-pipeline pipeline :input input :context ctx)
             ctx)))

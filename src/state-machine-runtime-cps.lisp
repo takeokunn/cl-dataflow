@@ -1,22 +1,29 @@
 (in-package #:cl-dataflow)
 
+(defmacro %signal-state-machine-error (condition machine event-type detail &rest initargs)
+  `(error ',condition
+          :state (state-machine-state ,machine)
+          :event-type ,event-type
+          :detail ,detail
+          ,@initargs))
+
 (defun %resolve-transition/cps (machine event-type continuation)
   (let ((transition (%find-transition machine event-type)))
     (unless transition
-      (error 'invalid-transition-error
-             :state (state-machine-state machine)
-             :event-type event-type
-             :detail (%transition-error-detail machine event-type)))
+      (%signal-state-machine-error invalid-transition-error
+                                   machine
+                                   event-type
+                                   (%transition-error-detail machine event-type)))
     (funcall continuation transition)))
 
 (defun %ensure-transition-guard/cps (machine transition event context event-type continuation)
   (let ((guard (transition-guard transition)))
     (when (and guard (not (funcall guard machine event context)))
-      (error 'guard-failed-error
-             :state (state-machine-state machine)
-             :event-type event-type
-             :transition (%copy-state-transition transition)
-             :detail (%guard-error-detail machine event-type)))
+      (%signal-state-machine-error guard-failed-error
+                                   machine
+                                   event-type
+                                   (%guard-error-detail machine event-type)
+                                   :transition (%copy-state-transition transition)))
     (funcall continuation transition)))
 
 (defun %run-transition-action/cps (machine transition event context continuation)
@@ -54,22 +61,29 @@
         :guard-passed t
         :action-result (%copy-structured-value action-result)))
 
+(defun %record-transition-history (machine transition-record)
+  (setf (slot-value machine 'history)
+        (cons (%copy-transition-record transition-record)
+              (%state-machine-history-list machine))))
+
+(defun %record-context-trace (context transition-record)
+  (when context
+    (setf (slot-value context 'trace)
+          (cons (%copy-transition-record transition-record)
+                (%context-trace-list context)))))
+
 (defun %commit-transition/cps (machine context transition event-type previous-state next-state action-result continuation)
   (let ((transition-record (%make-transition-record transition
                                                    event-type
                                                    previous-state
                                                    next-state
                                                    action-result)))
-    (let ((history-record (%copy-transition-record transition-record))
-          (trace-record (%copy-transition-record transition-record)))
-      (setf (slot-value machine 'history)
-            (cons history-record (%state-machine-history-list machine)))
-      (setf (state-machine-state machine) next-state)
-      (when context
-        (setf (context-state context) next-state)
-        (setf (slot-value context 'trace)
-              (cons trace-record (%context-trace-list context))))
-      (funcall continuation machine (%copy-transition-record transition-record)))))
+    (%record-transition-history machine transition-record)
+    (setf (state-machine-state machine) next-state)
+    (when context
+      (setf (context-state context) next-state))
+    (%record-context-trace context transition-record)
+    (funcall continuation machine (%copy-transition-record transition-record))))
 
 (defun %step-state-machine/cps (machine event context event-type continuation)
   (%resolve-transition/cps

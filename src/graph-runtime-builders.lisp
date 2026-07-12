@@ -3,11 +3,10 @@
 (defun %remap-pipeline-stages (graph stages)
   (mapcar (lambda (stage)
             (or (find-node graph (node-name stage))
-                (error 'node-not-found-error
-                       :graph (%copy-error-value graph)
-                       :designator (%copy-error-value stage)
-                       :detail (format nil "Pipeline stage is not present in the graph: ~A"
-                                       (node-name stage)))))
+                (%signal-node-not-found-error graph
+                                              stage
+                                              (format nil "Pipeline stage is not present in the graph: ~A"
+                                                      (node-name stage)))))
           stages))
 
 (defun (setf pipeline-graph) (graph-value pipeline)

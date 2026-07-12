@@ -1,12 +1,16 @@
 (in-package #:cl-dataflow)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun %copy-instance-slot-initargs (slots)
+    (mapcan (lambda (slot-spec)
+              (destructuring-bind (initarg form) slot-spec
+                (list initarg form)))
+            slots)))
+
 (defmacro define-copy-instance (name (source class) &body slots)
   `(defun ,name (,source)
      (make-instance ',class
-       ,@(mapcan (lambda (slot-spec)
-                   (destructuring-bind (initarg form) slot-spec
-                     (list initarg form)))
-                 slots))))
+       ,@(%copy-instance-slot-initargs slots))))
 
 (defmacro define-copy-instance-with-check (name (source class expected-kind expected-symbol)
                                            &body slots)
@@ -17,19 +21,7 @@
               :value ,source
               :detail (%expected-object-detail ,expected-kind ,source)))
      (make-instance ',class
-       ,@(mapcan (lambda (slot-spec)
-                   (destructuring-bind (initarg form) slot-spec
-                     (list initarg form)))
-                 slots))))
-
-(defmacro define-copy-hash-table (name (source element-copy))
-  `(defun ,name (,source)
-     (let ((copy (make-hash-table :test (hash-table-test ,source)
-                                  :size (hash-table-count ,source))))
-       (maphash (lambda (key value)
-                  (setf (gethash key copy) (funcall ,element-copy value)))
-                ,source)
-       copy)))
+       ,@(%copy-instance-slot-initargs slots))))
 
 (define-copy-instance-with-check %copy-event (event event "EVENT" event)
   (:type (%read-slot event 'type))
@@ -70,14 +62,17 @@
 (define-copy-hash-table %copy-node-table-error-snapshot
     (nodes #'%copy-node-error-snapshot))
 
+(defun %copy-graph-base (graph)
+  (make-graph :metadata (graph-metadata graph)))
+
 (defun %copy-graph-snapshot (graph)
-  (let ((copy (make-graph :metadata (graph-metadata graph))))
+  (let ((copy (%copy-graph-base graph)))
     (setf (graph-nodes copy) (graph-nodes graph))
     (setf (graph-edges copy) (graph-edges graph))
     copy))
 
 (defun %copy-graph-error-snapshot (graph)
-  (let ((copy (make-graph :metadata (graph-metadata graph))))
+  (let ((copy (%copy-graph-base graph)))
     (setf (slot-value copy 'nodes)
           (%copy-node-table-error-snapshot (slot-value graph 'nodes)))
     (setf (slot-value copy 'edges)

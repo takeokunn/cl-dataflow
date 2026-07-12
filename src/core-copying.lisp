@@ -3,13 +3,21 @@
 (defun %make-result-table ()
   (make-hash-table :test #'equal))
 
-(defun %copy-hash-table (table)
+(defun %copy-hash-table-with-value-transform (table value-transform)
   (let ((copy (make-hash-table :test (hash-table-test table)
                                :size (hash-table-count table))))
     (maphash (lambda (key value)
-               (setf (gethash key copy) value))
+               (setf (gethash key copy)
+                     (funcall value-transform value)))
              table)
     copy))
+
+(defmacro define-copy-hash-table (name (source element-copy))
+  `(defun ,name (,source)
+     (%copy-hash-table-with-value-transform ,source ,element-copy)))
+
+(defun %copy-hash-table (table)
+  (%copy-hash-table-with-value-transform table #'identity))
 
 (defun %copy-structured-value (value)
   (cond
@@ -22,12 +30,7 @@
     (t value)))
 
 (defun %copy-result-table (table)
-  (let ((copy (make-hash-table :test (hash-table-test table)
-                               :size (hash-table-count table))))
-    (maphash (lambda (key value)
-               (setf (gethash key copy) (%copy-structured-value value)))
-             table)
-    copy))
+  (%copy-hash-table-with-value-transform table #'%copy-structured-value))
 
 (defun %copy-effect-handlers (effect-handlers)
   (let ((copy (make-hash-table :test #'equal

@@ -44,6 +44,20 @@
                        :transitions (list ,@transition-names))))
        ,@body)))
 
+(defmacro with-state-machine-run-fixture ((machine) &body body)
+  `(with-state-machine-fixture (,machine
+                                :state "idle"
+                                :transitions ((start-transition "idle" "start" "running")
+                                              (finish-transition "running" "finish" "completed")))
+     ,@body))
+
+(defmacro with-idle-start-transition-machine ((machine &rest transition-options) &body body)
+  `(with-state-machine-fixture (,machine
+                                :state "idle"
+                                :transitions ((transition "idle" "start" "running"
+                                                          ,@transition-options)))
+     ,@body))
+
 (defmacro define-example-script-tests (&body specs)
   `(progn
      ,@(mapcar (lambda (spec)
@@ -92,6 +106,21 @@
                                           `(:metadata ,pipeline-metadata))))))
      ,@body))
 
+
+
+
+
+(defmacro %branching-test-split-handler ()
+  `(lambda (input context)
+     (declare (ignore context))
+     (list (cons "left" (+ input 1))
+           (cons "right" (* input 2)))))
+
+(defmacro %branching-test-offset-handler (offset)
+  `(lambda (input context)
+     (declare (ignore context))
+     (+ input ,offset)))
+
 (defmacro with-branching-test-pipeline ((graph pipeline source left right
                                                &key source-handler
                                                     left-handler
@@ -101,20 +130,13 @@
           (,source (make-node "source"
                               :outputs '("left" "right")
                               :handler ,(or source-handler
-                                            '(lambda (input context)
-                                               (declare (ignore context))
-                                               (list (cons "left" (+ input 1))
-                                                     (cons "right" (* input 2)))))))
-           (,left (make-node "left"
-                             :handler ,(or left-handler
-                                           '(lambda (input context)
-                                              (declare (ignore context))
-                                              (+ input 10)))))
-            (,right (make-node "right"
-                               :handler ,(or right-handler
-                                             '(lambda (input context)
-                                                (declare (ignore context))
-                                              (+ input 20)))))
+                                            '(%branching-test-split-handler))))
+          (,left (make-node "left"
+                            :handler ,(or left-handler
+                                          '(%branching-test-offset-handler 10))))
+          (,right (make-node "right"
+                             :handler ,(or right-handler
+                                           '(%branching-test-offset-handler 20))))
           (,pipeline (progn
                        (dolist (node (list ,source ,left ,right))
                          (add-node ,graph node))
@@ -122,6 +144,31 @@
                        (add-edge ,graph ,source ,right :from-port "right")
                        (make-pipeline :graph ,graph))))
      ,@body))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun %graph-fixture-node-binding (spec)
+    (destructuring-bind (name label &rest initargs) spec
+      `(,name (make-node ,label ,@initargs))))
+
+  (defun %graph-fixture-node-name (spec)
+    (first spec))
+
+  (defun %graph-fixture-edge-form (graph spec)
+    (destructuring-bind (from to &rest options) spec
+      `(add-edge ,graph ,from ,to ,@options))))
+
+(defmacro with-graph-fixture ((graph nodes &key edges) &body body)
+  (let ((node-bindings (mapcar #'%graph-fixture-node-binding nodes))
+        (node-names (mapcar #'%graph-fixture-node-name nodes))
+        (edge-forms (mapcar (lambda (spec)
+                              (%graph-fixture-edge-form graph spec))
+                            edges)))
+    `(let* ((,graph (make-graph))
+            ,@node-bindings)
+       (dolist (node (list ,@node-names))
+         (add-node ,graph node))
+       ,@edge-forms
+       ,@body)))
 
 (defun make-test-table (&rest bindings)
   (let ((table (make-hash-table :test #'equal)))

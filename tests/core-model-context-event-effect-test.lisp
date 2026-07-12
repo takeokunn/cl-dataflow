@@ -1,5 +1,14 @@
 (in-package #:cl-dataflow.test)
 
+(defmacro define-copy-rejects-non-value-test (name call expected-type invalid-value)
+  `(deftest ,name
+     (let ((captured
+             (capture-condition (condition invalid-input-error)
+               ,call)))
+       (is captured)
+       (is (equal (invalid-input-expected captured) ,expected-type))
+       (is (equal (invalid-input-value captured) ,invalid-value)))))
+
 (deftest context-result-setter-copies-mutable-values
   (let* ((context (make-context))
          (result (list (list :sink 1))))
@@ -98,13 +107,7 @@
     (is (equal (event-payload event) '(:id 1)))
     (is (equal (event-metadata event) '((:kind :event))))))
 
-(deftest copy-event-rejects-non-event-values
-  (let ((captured
-          (capture-condition (condition invalid-input-error)
-            (copy-event 'not-an-event))))
-    (is captured)
-    (is (equal (invalid-input-expected captured) 'event))
-    (is (equal (invalid-input-value captured) 'not-an-event))))
+(define-copy-rejects-non-value-test copy-event-rejects-non-event-values (copy-event (quote not-an-event)) (quote event) (quote not-an-event))
 
 (deftest copy-effect-produces-independent-effect
   (let* ((effect (make-effect "audit"
@@ -141,10 +144,4 @@
     (is (equal (effect-metadata effect) '((:kind :effect))))
     (is (equal (effect-result effect) '(:handled (:message "ok"))))))
 
-(deftest copy-effect-rejects-non-effect-values
-  (let ((captured
-          (capture-condition (condition invalid-input-error)
-            (copy-effect 'not-an-effect))))
-    (is captured)
-    (is (equal (invalid-input-expected captured) 'effect))
-    (is (equal (invalid-input-value captured) 'not-an-effect))))
+(define-copy-rejects-non-value-test copy-effect-rejects-non-effect-values (copy-effect (quote not-an-effect)) (quote effect) (quote not-an-effect))

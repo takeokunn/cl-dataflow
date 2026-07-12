@@ -1,32 +1,35 @@
 (in-package #:cl-dataflow)
 
-(defun %incoming-edges (graph node-name)
-  (remove-if-not (lambda (edge)
-                   (equal (edge-to edge) node-name))
-                 (%graph-edges-list graph)))
+(progn
+  (defun %edge-list-by-endpoint (graph node-name endpoint-accessor)
+    (remove-if-not (lambda (edge)
+                     (equal (funcall endpoint-accessor edge) node-name))
+                   (%graph-edges-list graph)))
 
-(defun %outgoing-edges (graph node-name)
-  (remove-if-not (lambda (edge)
-                   (equal (edge-from edge) node-name))
-                 (%graph-edges-list graph)))
+  (defun %incoming-edge-list (graph node-name)
+    (%edge-list-by-endpoint graph node-name #'edge-to)))
+
+(defun %outgoing-edge-list (graph node-name)
+  (%edge-list-by-endpoint graph node-name #'edge-from))
 
 (defun %source-node-p (graph node)
-  (null (%incoming-edges graph (node-name node))))
+  (null (%incoming-edge-list graph (node-name node))))
 
 (defun %sink-node-p (graph node)
-  (null (%outgoing-edges graph (node-name node))))
+  (null (%outgoing-edge-list graph (node-name node))))
 
-(defun graph-source-nodes (graph)
-  (mapcar #'%copy-node-snapshot
-          (remove-if-not (lambda (node)
-                           (%source-node-p graph node))
-                         (topological-sort graph))))
+(progn
+  (defun %boundary-nodes (graph boundary-predicate)
+    (mapcar #'%copy-node-snapshot
+            (remove-if-not (lambda (node)
+                             (funcall boundary-predicate graph node))
+                           (topological-sort graph))))
+
+  (defun graph-source-nodes (graph)
+    (%boundary-nodes graph #'%source-node-p)))
 
 (defun graph-sink-nodes (graph)
-  (mapcar #'%copy-node-snapshot
-          (remove-if-not (lambda (node)
-                           (%sink-node-p graph node))
-                         (topological-sort graph))))
+  (%boundary-nodes graph #'%sink-node-p))
 
 (defun %initialize-topological-state (nodes)
   (let ((indegree (%make-result-table))
@@ -41,11 +44,11 @@
 (defun %register-topological-edge (graph edge nodes indegree adjacency)
   (unless (and (gethash (edge-from edge) nodes)
                (gethash (edge-to edge) nodes))
-    (error 'node-not-found-error
-           :graph (%copy-error-value graph)
-           :designator (%copy-error-value edge)
-           :detail (format nil "Edge references missing node: ~A -> ~A"
-                           (edge-from edge) (edge-to edge))))
+    (%signal-node-not-found-error graph
+                                  edge
+                                  (format nil "Edge references missing node: ~A -> ~A"
+                                          (edge-from edge)
+                                          (edge-to edge))))
   (push edge (gethash (edge-from edge) adjacency))
   (incf (gethash (edge-to edge) indegree)))
 

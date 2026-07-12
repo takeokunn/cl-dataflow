@@ -31,7 +31,7 @@
                                    (values updated-machine transition-records))))
 
 (defun run-state-machine-with-context (machine events &key context)
-  (let ((ctx (or context (make-context :state (state-machine-state machine)))))
+  (let ((ctx (or context (%make-runtime-context :state (state-machine-state machine)))))
     (multiple-value-bind (updated-machine transition-records)
         (run-state-machine machine events :context ctx)
       (setf (context-state ctx) (state-machine-state updated-machine))

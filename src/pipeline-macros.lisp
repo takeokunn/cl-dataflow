@@ -9,6 +9,23 @@
                               stage)))
              ,stages))
 
+  (defun %plist-option (key value)
+    (when value
+      (list key value)))
+
+  (defun %invalid-structured-clause-error (expected value detail)
+    (error 'invalid-input-error
+           :expected expected
+           :value value
+           :detail detail))
+
+  (defun %unsupported-structured-clause-error (macro-name expected clause)
+    (%invalid-structured-clause-error expected
+                                       (first clause)
+                                       (format nil "Unsupported ~A clause: ~S"
+                                               macro-name
+                                               (first clause))))
+
   (defun %parse-pipeline-node-clause (clause)
     (destructuring-bind (_ name &rest options) clause
       (declare (ignore _))
@@ -34,20 +51,19 @@
 
   (defun %parse-pipeline-clause (clause)
     (unless (and (listp clause) (consp clause))
-      (error 'invalid-input-error
-             :expected '((:node name &rest options)
-                         (:edge from to &rest options))
-             :value clause
-             :detail "DEFINE-PIPELINE clauses must start with :NODE or :EDGE."))
+      (%invalid-structured-clause-error
+       '((:node name &rest options)
+         (:edge from to &rest options))
+       clause
+       "DEFINE-PIPELINE clauses must start with :NODE or :EDGE."))
     (case (first clause)
       (:node (%parse-pipeline-node-clause clause))
       (:edge (%parse-pipeline-edge-clause clause))
       (t
-       (error 'invalid-input-error
-              :expected '(:node :edge)
-              :value (first clause)
-              :detail (format nil "Unsupported DEFINE-PIPELINE clause: ~S"
-                              (first clause))))))
+       (%unsupported-structured-clause-error
+        "DEFINE-PIPELINE"
+        '(:node :edge)
+        clause))))
 
   (defun %parse-pipeline-definition (options clauses)
     (%macro-validate-option-list options '(:metadata :stages)
@@ -55,15 +71,15 @@
     (%with-plist-bindings (options ((metadata :metadata)
                                     (stages :stages)))
       `(let ((graph (make-graph
-                     ,@(when metadata
-                         (list :metadata metadata)))))
+                     ,@(%plist-option :metadata metadata))))
          ,@(mapcar #'%parse-pipeline-clause clauses)
          (make-pipeline :graph graph
+                        ,@(%plist-option :metadata metadata)
                         ,@(when stages
                             (list :stages
                                   `(%resolve-pipeline-stage-designators
                                     graph
-                                    ,stages))))))))
+                                    ,stages)))))))
 
   (defun %parse-workflow-transition-clause (clause)
     (destructuring-bind (_ from event to &rest options) clause
@@ -84,24 +100,34 @@
 
   (defun %parse-workflow-clause (clause)
     (unless (and (listp clause) (consp clause))
-      (error 'invalid-input-error
-             :expected '((:transition from event to &rest options)
-                         (:node name &rest options)
-                         (:edge from to &rest options)
-                         (:machine-node &rest options))
-             :value clause
-             :detail "DEFINE-WORKFLOW clauses must start with :TRANSITION, :NODE, :EDGE, or :MACHINE-NODE."))
+      (%invalid-structured-clause-error
+       '((:transition from event to &rest options)
+         (:node name &rest options)
+         (:edge from to &rest options)
+         (:machine-node &rest options))
+       clause
+       "DEFINE-WORKFLOW clauses must start with :TRANSITION, :NODE, :EDGE, or :MACHINE-NODE."))
     (case (first clause)
       (:transition `(:transition ,(%parse-workflow-transition-clause clause)))
       (:node `(:pipeline-node ,(%parse-pipeline-node-clause clause)))
       (:edge `(:pipeline-edge ,(%parse-pipeline-edge-clause clause)))
       (:machine-node `(:pipeline-node ,(%parse-workflow-machine-node-clause clause)))
       (t
-       (error 'invalid-input-error
-              :expected '(:transition :node :edge :machine-node)
-              :value (first clause)
-              :detail (format nil "Unsupported DEFINE-WORKFLOW clause: ~S"
-                              (first clause))))))
+       (%unsupported-structured-clause-error
+        "DEFINE-WORKFLOW"
+        '(:transition :node :edge :machine-node)
+        clause))))
+
+  (defun %workflow-clause-forms (parsed-clauses)
+    (values (loop for (kind form) in parsed-clauses
+                  when (eq kind :transition)
+                  collect form)
+            (loop for (kind form) in parsed-clauses
+                  when (eq kind :pipeline-node)
+                  collect form)
+            (loop for (kind form) in parsed-clauses
+                  when (eq kind :pipeline-edge)
+                  collect form)))
 
   (defun %parse-workflow-definition (options clauses)
     (%macro-validate-option-list options
@@ -114,44 +140,32 @@
                                     (machine-metadata :machine-metadata)
                                     (pipeline-metadata :pipeline-metadata)
                                     (stages :stages)))
-      (let* ((parsed-clauses (mapcar #'%parse-workflow-clause clauses))
-             (transition-forms (loop for (kind form) in parsed-clauses
-                                     when (eq kind :transition)
-                                     collect form))
-             (pipeline-node-forms (loop for (kind form) in parsed-clauses
-                                        when (eq kind :pipeline-node)
-                                        collect form))
-             (pipeline-edge-forms (loop for (kind form) in parsed-clauses
-                                        when (eq kind :pipeline-edge)
-                                        collect form)))
+      (multiple-value-bind (transition-forms pipeline-node-forms pipeline-edge-forms)
+          (%workflow-clause-forms (mapcar #'%parse-workflow-clause clauses))
         `(let* ((machine (make-state-machine
-                          ,@(when state
-                              (list :state state))
-                          ,@(when initial-state
-                              (list :initial-state initial-state))
-                          ,@(when history
-                              (list :history history))
-                          ,@(when machine-metadata
-                              (list :metadata machine-metadata))
+                          ,@(%plist-option :state state)
+                          ,@(%plist-option :initial-state initial-state)
+                          ,@(%plist-option :history history)
+                          ,@(%plist-option :metadata machine-metadata)
                           :transitions (list ,@transition-forms)))
                 (graph (make-graph
-                        ,@(when pipeline-metadata
-                            (list :metadata pipeline-metadata)))))
+                        ,@(%plist-option :metadata pipeline-metadata))))
            ,@pipeline-node-forms
            ,@pipeline-edge-forms
            (values
             (make-pipeline :graph graph
-                           ,@(when pipeline-metadata
-                               (list :metadata pipeline-metadata))
+                           ,@(%plist-option :metadata pipeline-metadata)
                            ,@(when stages
                                (list :stages
                                      `(%resolve-pipeline-stage-designators
                                        graph
                                        ,stages))))
-            machine)))))
+            machine))))
 
-(defmacro define-pipeline ((&rest options) &body clauses)
-  (%parse-pipeline-definition options clauses))
+  (defmacro define-pipeline ((&rest options) &body clauses)
+    (%parse-pipeline-definition options clauses))
 
-(defmacro define-workflow ((&rest options) &body clauses)
-  (%parse-workflow-definition options clauses))
+  (defmacro define-workflow ((&rest options) &body clauses)
+    (%parse-workflow-definition options clauses))
+)
+)

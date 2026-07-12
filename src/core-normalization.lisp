@@ -35,42 +35,51 @@
         (nth (1+ position) plist)
         default)))
 
-(defun %normalize-structured-input (value ports)
-  (let ((port-count (length ports))
-        (first-port (first ports)))
+(defun %normalize-port-alist (value ports)
+  (cond
+    ((hash-table-p value)
+     (loop for port in ports
+           collect (cons port (gethash port value))))
+    ((and (listp value) (every #'consp value))
+     (loop for port in ports
+           for cell = (assoc port value :test #'equal)
+           collect (cons port (and cell (cdr cell)))))
+    ((and (listp value) (evenp (length value)))
+     (loop for (key val) on value by #'cddr
+           collect (cons (%normalize-name key) val)))
+    (t nil)))
+
+(defun %structured-value-p (value)
+  (or (hash-table-p value)
+      (and (listp value) (every #'consp value))
+      (and (listp value) (evenp (length value)))))
+
+(defun %normalize-single-port-structure (value ports)
+  (let ((first-port (first ports)))
     (cond
       ((hash-table-p value)
-       (if (= port-count 1)
-           (gethash first-port value)
-           (loop for port in ports
-                 collect (cons port (gethash port value)))))
+       (gethash first-port value))
       ((and (listp value) (every #'consp value))
-       (if (= port-count 1)
-           (cdr (assoc first-port value :test #'equal))
-           (loop for port in ports
-                 for cell = (assoc port value :test #'equal)
-                 collect (cons port (and cell (cdr cell))))))
+       (cdr (assoc first-port value :test #'equal)))
       ((and (listp value) (evenp (length value)))
-       (if (= port-count 1)
-           (%plist-value value first-port)
-           (loop for (key val) on value by #'cddr
-                 collect (cons (%normalize-name key) val))))
+       (%plist-value value first-port))
+      (t value))))
+
+(defun %normalize-structured-input (value ports)
+  (let ((port-count (length ports)))
+    (cond
+      ((and (= port-count 1) (%structured-value-p value))
+       (%normalize-single-port-structure value ports))
+      ((%structured-value-p value)
+       (%normalize-port-alist value ports))
       (t value))))
 
 (defun %normalize-output-structure (value ports)
   (let ((first-port (first ports)))
     (cond
       ((null ports) value)
-      ((hash-table-p value)
-       (loop for port in ports
-             collect (cons port (gethash port value))))
-      ((and (listp value) (every #'consp value))
-       (loop for port in ports
-             for cell = (assoc port value :test #'equal)
-             collect (cons port (and cell (cdr cell)))))
-      ((and (listp value) (evenp (length value)))
-       (loop for (key val) on value by #'cddr
-             collect (cons (%normalize-name key) val)))
+      ((%structured-value-p value)
+       (%normalize-port-alist value ports))
       (t (list (cons first-port value))))))
 
 (defun %node-designator-name (designator)

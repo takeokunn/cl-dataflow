@@ -13,10 +13,9 @@
                            :payload '(:id 1))
                      (list :effect "audit"
                            :result '(:ok t)))))
-    (assert-context-trace-entry context 0
-      (:payload '(:id 1)))
-    (assert-context-trace-entry context 1
-      (:result '(:ok t)))))
+    (assert-context-trace-entries context
+      (0 (:payload '(:id 1)))
+      (1 (:result '(:ok t))))))
 
 (deftest scalar-and-designator-setters-normalize-values
   (let ((node (make-node "source"))

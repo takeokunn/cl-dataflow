@@ -8,43 +8,45 @@
     (reset-state-machine machine)
     (is (equal (state-machine-state machine) "idle"))))
 
-(deftest state-machine-copy-produces-independent-machine
-  (let* ((machine (make-state-machine
-                   :state "idle"
-                   :metadata '((:kind :original))
-                   :transitions (list (make-transition "idle" "start" "running"
-                                                       :metadata '((:labels "alpha"))))))
-         (copy (copy-state-machine machine)))
+(define-snapshot-isolation-test state-machine-copy-produces-independent-machine
+  ((machine (make-state-machine
+             :state "idle"
+             :metadata '((:kind :original))
+             :transitions (list (make-transition "idle" "start" "running"
+                                                 :metadata '((:labels "alpha")))))))
+  (copy (copy-state-machine machine))
+  (progn
     (is (not (eq copy machine)))
     (setf (state-machine-state copy) "running")
     (setf (state-machine-metadata copy) '((:kind :copied)))
     (setf (transition-metadata (first (state-machine-transitions copy)))
-          '((:labels "mutated")))
-    (is (equal (state-machine-state machine) "idle"))
-    (is (equal (state-machine-metadata machine) '((:kind :original))))
-    (is (equal (transition-metadata (first (state-machine-transitions machine)))
-               '((:labels "alpha"))))))
+          '((:labels "mutated"))))
+  (is (equal (state-machine-state machine) "idle"))
+  (is (equal (state-machine-metadata machine) '((:kind :original))))
+  (is (equal (transition-metadata (first (state-machine-transitions machine)))
+             '((:labels "alpha")))))
 
-(deftest state-machine-constructor-copies-transition-objects
-  (let* ((transition (make-transition "idle" "start" "running"
-                                      :metadata '((:labels "alpha"))))
-         (machine (make-state-machine
-                   :state "idle"
-                   :transitions (list transition)))
-         (stored (first (state-machine-transitions machine))))
-    (is (not (eq stored transition)))
-    (setf (transition-metadata stored) '((:labels "mutated")))
-    (is (equal (transition-metadata transition) '((:labels "alpha"))))))
+(define-snapshot-isolation-test state-machine-constructor-copies-transition-objects
+  ((transition (make-transition "idle" "start" "running"
+                                 :metadata '((:labels "alpha"))))
+   (machine (make-state-machine
+             :state "idle"
+             :transitions (list transition))))
+  (stored (first (state-machine-transitions machine)))
+  (is (not (eq stored transition)))
+  (setf (transition-metadata stored) '((:labels "mutated")))
+  (is (equal (transition-metadata transition) '((:labels "alpha")))))
 
-(deftest state-machine-setter-copies-transition-objects
-  (let* ((transition (make-transition "idle" "start" "running"
-                                      :metadata '((:labels "alpha"))))
-         (machine (make-state-machine :state "idle")))
+(define-snapshot-isolation-test state-machine-setter-copies-transition-objects
+  ((transition (make-transition "idle" "start" "running"
+                                 :metadata '((:labels "alpha"))))
+   (machine (make-state-machine :state "idle")))
+  (progn
     (setf (state-machine-transitions machine) (list transition))
-    (let ((stored (first (state-machine-transitions machine))))
-      (is (not (eq stored transition)))
-      (setf (transition-metadata stored) '((:labels "mutated")))
-      (is (equal (transition-metadata transition) '((:labels "alpha")))))))
+    (first (state-machine-transitions machine)))
+  (is (not (eq stored transition)))
+  (setf (transition-metadata stored) '((:labels "mutated")))
+  (is (equal (transition-metadata transition) '((:labels "alpha")))))
 
 (deftest state-machine-rejects-malformed-transition-lists-at-runtime
   (let ((machine (make-state-machine :state "idle")))

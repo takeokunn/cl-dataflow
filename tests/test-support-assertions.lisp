@@ -23,23 +23,24 @@
      (is ,var)
      ,@assertions))
 
-(defmacro assert-plist-entry (entry &rest expected-pairs)
-  (let ((entry-name (gensym "ENTRY-")))
-    `(let ((,entry-name ,entry))
+(progn
+  (defmacro %assert-plist-pairs (entry-name &rest expected-pairs)
+    `(progn
        ,@(mapcar (lambda (expected-pair)
                    (destructuring-bind (key expected-value) expected-pair
                      `(is (equal (getf ,entry-name ,key) ,expected-value))))
                  expected-pairs)
-       t)))
+       t))
+
+  (defmacro assert-plist-entry (entry &rest expected-pairs)
+    (let ((entry-name (gensym "ENTRY-")))
+      `(let ((,entry-name ,entry))
+         (%assert-plist-pairs ,entry-name ,@expected-pairs)))))
 
 (defmacro assert-plist-entries (entries &rest expected-pairs)
   (let ((entry-name (gensym "ENTRY-")))
     `(dolist (,entry-name ,entries)
-       ,@(mapcar (lambda (expected-pair)
-                   (destructuring-bind (key expected-value) expected-pair
-                     `(is (equal (getf ,entry-name ,key) ,expected-value))))
-                 expected-pairs)
-       t)))
+       (%assert-plist-pairs ,entry-name ,@expected-pairs))))
 
 (defmacro assert-transition-record (record &rest expected-pairs)
   `(assert-plist-entry ,record ,@expected-pairs))
@@ -47,11 +48,20 @@
 (defmacro assert-transition-records (records &rest expected-pairs)
   `(assert-plist-entries ,records ,@expected-pairs))
 
-(defmacro assert-context-trace-entry (context index &rest expected-pairs)
-  `(assert-plist-entry (nth ,index (context-trace ,context)) ,@expected-pairs))
+(progn
+  (defmacro assert-context-trace-entry (context index &rest expected-pairs)
+    `(assert-plist-entry (nth ,index (context-trace ,context)) ,@expected-pairs))
 
-(defmacro assert-context-first-trace-entry (context &rest expected-pairs)
-  `(assert-context-trace-entry ,context 0 ,@expected-pairs))
+  (defmacro assert-context-trace-entries (context &rest clauses)
+    `(progn
+       ,@(mapcar (lambda (clause)
+                   (destructuring-bind (index &rest expected-pairs) clause
+                     `(assert-context-trace-entry ,context ,index ,@expected-pairs)))
+                 clauses)
+       t))
+
+  (defmacro assert-context-first-trace-entry (context &rest expected-pairs)
+    `(assert-context-trace-entry ,context 0 ,@expected-pairs)))
 
 (defmacro set-plist-entry (place key value)
   `(setf (getf ,place ,key) ,value))
@@ -125,6 +135,16 @@
          ,mutation-form
          ,@assertions))))
 
+(defmacro define-snapshot-payload-isolation-test (name bindings (snapshot form)
+                                                   payload-form expected-form
+                                                   expected-value)
+  `(define-snapshot-isolation-test ,name
+       ,bindings
+       (,snapshot ,form)
+       (let ((payload ,payload-form))
+         (setf (cadr payload) "mutated"))
+       (is (equal ,expected-form ,expected-value))))
+
 (defmacro define-invalid-dsl-test (name form invalid-value detail-substring)
   `(deftest ,name
      (with-captured-condition (captured invalid-input-error)
@@ -143,6 +163,41 @@
 (defmacro assert-condition-report (condition expected-substring)
   `(is (search ,expected-substring
                (condition-report-string ,condition))))
+
+(defmacro assert-graph-condition (condition graph expected-detail &key type designator)
+  `(progn
+     (is (typep ,condition 'graph-error))
+     (is (eq (graph-error-graph ,condition) ,graph))
+     (is (equal (graph-error-detail ,condition) ,expected-detail))
+     (assert-condition-report ,condition ,expected-detail)
+     ,@(when type
+         `((is (typep ,condition ,type))))
+     ,@(when designator
+         `((is (equal (node-not-found-designator ,condition) ,designator))))))
+
+(defmacro assert-state-machine-condition (condition condition-class state event-type
+                                         expected-detail &key transition)
+  (ecase condition-class
+    (invalid-transition-error
+     `(progn
+        (is (typep ,condition 'invalid-transition-error))
+        (is (equal (invalid-transition-state ,condition) ,state))
+        (is (equal (invalid-transition-event-type ,condition) ,event-type))
+        (is (equal (invalid-transition-detail ,condition) ,expected-detail))
+        (assert-condition-report ,condition ,expected-detail)))
+    (guard-failed-error
+     `(progn
+        (is (typep ,condition 'guard-failed-error))
+        (is (equal (guard-failed-state ,condition) ,state))
+        (is (equal (guard-failed-event-type ,condition) ,event-type))
+        ,@(when transition
+            `((is (not (eq (guard-failed-transition ,condition) ,transition)))
+              (is (equal (transition-from (guard-failed-transition ,condition))
+                         (transition-from ,transition)))
+              (is (equal (transition-event-type (guard-failed-transition ,condition))
+                         (transition-event-type ,transition)))))
+        (is (equal (guard-failed-detail ,condition) ,expected-detail))
+        (assert-condition-report ,condition ,expected-detail)))))
 
 (defmacro define-public-api-contract-test (name package-name &body groups)
   (let ((documented-symbols

@@ -1,14 +1,5 @@
 (in-package #:cl-dataflow)
 
-(defun run-pipeline-with-test-context (pipeline &key input effect-handlers state metadata)
-  (let ((context (make-context :state state
-                               :metadata metadata
-                               :effect-handlers effect-handlers)))
-    (multiple-value-bind (result run-context)
-        (run-pipeline-with-context pipeline :input input :context context)
-      (declare (ignore result))
-      run-context)))
-
 (defun %normalize-expected-list (value)
   (if (listp value) value (list value)))
 
@@ -16,10 +7,8 @@
   `(defun ,name ,lambda-list
      (let ((actual ,actual-form)
            (expected-value ,expected-form))
-       (assert (equal actual expected-value)
-               (actual expected-value)
-               ,message
-               expected-value actual)
+       (unless (equal actual expected-value)
+         (error ,message expected-value actual))
        t)))
 
 (%define-assertion assert-emitted-events
@@ -51,3 +40,12 @@
     (context-result context)
     expected
     "Expected pipeline result ~S but saw ~S")
+
+(defun run-pipeline-with-test-context (pipeline &key input effect-handlers state metadata)
+  (let ((context (%make-runtime-context :state state
+                                        :metadata metadata
+                                        :effect-handlers effect-handlers)))
+    (multiple-value-bind (result run-context)
+        (run-pipeline-with-context pipeline :input input :context context)
+      (declare (ignore result))
+      run-context)))

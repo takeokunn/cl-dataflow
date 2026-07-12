@@ -1,9 +1,7 @@
 (in-package #:cl-dataflow.test)
 
 (deftest state-machine-transition
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running")))
+  (with-idle-start-transition-machine (machine)
     (step-state-machine machine "start")
     (is (equal (state-machine-state machine) "running"))))
 
@@ -11,44 +9,33 @@
   (let ((action (lambda (machine event context)
                   (declare (ignore machine event context))
                   :ok)))
-    (with-state-machine-fixture (machine
-                                 :state "idle"
-                                 :transitions ((transition "idle" "start" "running"
-                                                           :action action)))
+    (with-idle-start-transition-machine (machine :action action)
       (let ((transition (first (state-machine-transitions machine))))
         (is (state-transition-p transition))
         (is (equal (transition-from transition) "idle"))
         (is (eq (transition-action transition) action))))))
 
 (deftest state-machine-guard-failure
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running"
-                                                         :guard (lambda (machine event context)
-                                                                  (declare (ignore machine event context))
-                                                                  nil))))
+  (with-idle-start-transition-machine (machine
+                                       :guard (lambda (machine event context)
+                                                (declare (ignore machine event context))
+                                                nil))
     (signals guard-failed-error
       (step-state-machine machine "start"))))
 
 (deftest state-machine-guard-failure-exposes-condition-data
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running"
-                                                         :guard (lambda (machine event context)
-                                                                  (declare (ignore machine event context))
-                                                                  nil))))
+  (with-idle-start-transition-machine (machine
+                                       :guard (lambda (machine event context)
+                                                (declare (ignore machine event context))
+                                                nil))
     (with-captured-condition (captured guard-failed-error)
         (step-state-machine machine "start")
-      (is (equal (guard-failed-state captured) "idle"))
-      (is (equal (guard-failed-event-type captured) "start"))
-      (is (not (eq (guard-failed-transition captured)
-                   (first (state-machine-transitions machine)))))
-      (is (equal (transition-from (guard-failed-transition captured)) "idle"))
-      (is (equal (transition-event-type (guard-failed-transition captured)) "start"))
-      (is (equal (guard-failed-detail captured)
-                 "Guard rejected transition from idle on event start"))
-      (assert-condition-report captured
-                               "Guard rejected transition from idle on event start"))))
+      (assert-state-machine-condition captured
+                                      guard-failed-error
+                                      "idle"
+                                      "start"
+                                      "Guard rejected transition from idle on event start"
+                                      :transition (first (state-machine-transitions machine))))))
 
 (deftest state-machine-invalid-transition
   (let ((machine (make-state-machine :state "idle" :transitions '())))
@@ -61,20 +48,17 @@
            (capture-condition (condition invalid-transition-error)
              (step-state-machine machine "start"))))
     (is captured)
-    (is (equal (invalid-transition-state captured) "idle"))
-    (is (equal (invalid-transition-event-type captured) "start"))
-    (is (equal (invalid-transition-detail captured)
-               "No transition from idle on event start"))
-    (assert-condition-report captured
-                             "No transition from idle on event start")))
+    (assert-state-machine-condition captured
+                                    invalid-transition-error
+                                    "idle"
+                                    "start"
+                                    "No transition from idle on event start")))
 
 (deftest state-machine-action-override
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running"
-                                                         :action (lambda (machine event context)
-                                                                   (declare (ignore machine event context))
-                                                                   "completed"))))
+  (with-idle-start-transition-machine (machine
+                                       :action (lambda (machine event context)
+                                                 (declare (ignore machine event context))
+                                                 "completed"))
     (step-state-machine machine "start")
     (is (equal (state-machine-state machine) "completed"))))
 
@@ -94,13 +78,11 @@
                "State machine requires STATE or INITIAL-STATE."))))
 
 (deftest state-machine-action-result-is-captured
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running"
-                                                         :action (lambda (machine event context)
-                                                                   (declare (ignore machine event context))
-                                                                   (values "completed"
-                                                                           '(:note "transitioned"))))))
+  (with-idle-start-transition-machine (machine
+                                       :action (lambda (machine event context)
+                                                 (declare (ignore machine event context))
+                                                 (values "completed"
+                                                         '(:note "transitioned"))))
       (multiple-value-bind (updated-machine transition-record)
         (step-state-machine machine "start")
       (declare (ignore updated-machine))
@@ -111,9 +93,7 @@
                  (state-machine-last-transition machine))))))
 
 (deftest state-machine-step-updates-context-state-and-trace
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running")))
+  (with-idle-start-transition-machine (machine)
     (let ((context (make-context :state "idle")))
       (with-stepped-state-machine (updated-machine transition-record machine "start"
                                                        :context context
@@ -135,16 +115,14 @@
   (let* ((captured-event nil)
          (captured-context nil)
          (event (make-event "start" :payload '(:step 1))))
-    (with-state-machine-fixture (machine
-                                 :state "idle"
-                                 :transitions ((transition "idle" "start" "running"
-                                                           :action (lambda (machine action-event action-context)
-                                                                     (declare (ignore machine))
-                                                                     (setf captured-event action-event
-                                                                           captured-context action-context)
-                                                                     (values 'completed
-                                                                             (list :event-type (event-type action-event)
-                                                                                   :payload (event-payload action-event)))))))
+    (with-idle-start-transition-machine (machine
+                                         :action (lambda (machine action-event action-context)
+                                                   (declare (ignore machine))
+                                                   (setf captured-event action-event
+                                                         captured-context action-context)
+                                                   (values 'completed
+                                                           (list :event-type (event-type action-event)
+                                                                 :payload (event-payload action-event)))))
       (let ((context (make-context :state "idle")))
         (with-stepped-state-machine (updated-machine transition-record machine event
                                                      :context context
@@ -164,9 +142,7 @@
             (:action-result '(:event-type "start" :payload (:step 1)))))))))
 
 (deftest state-machine-transition-records-are-copied-across-boundaries
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running")))
+  (with-idle-start-transition-machine (machine)
     (let ((context (make-context :state "idle")))
       (with-stepped-state-machine (updated-machine transition-record machine "start"
                                                    :context context
@@ -186,67 +162,6 @@
           (:state-before "trace-mutated")
           (:to "running")
           (:event-type "start"))
-        (assert-transition-record (first (state-machine-history machine))
-          (:to "running"))
-        (assert-transition-record (first (context-trace context))
+        (assert-transition-records (list (first (state-machine-history machine))
+                                         (first (context-trace context)))
           (:to "running"))))))
-
-(deftest state-machine-run-sequence
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((idle-start "idle" "start" "running")
-                                             (running-finish "running" "finish" "completed")))
-    (multiple-value-bind (updated-machine transition-records)
-        (run-state-machine machine '("start" "finish"))
-      (declare (ignore updated-machine))
-      (assert-event-sequence transition-records '("start" "finish")))
-    (assert-state-machine-state machine "completed")))
-
-(deftest state-machine-run-sequence-accepts-event-objects
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((idle-start "idle" "start" "running")
-                                             (running-finish "running" "finish" "completed")))
-    (let ((events (list (make-event "start" :payload '(:step 1))
-                        (make-event "finish" :payload '(:step 2)))))
-      (multiple-value-bind (updated-machine transition-records)
-          (run-state-machine machine events)
-        (declare (ignore updated-machine))
-        (assert-event-sequence transition-records '("start" "finish"))
-        (is (equal (state-machine-state machine) "completed"))))))
-
-(deftest state-machine-run-with-context-returns-transition-records-and-context
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((idle-start "idle" "start" "running")
-                                             (running-finish "running" "finish" "completed")))
-    (multiple-value-bind (updated-machine transition-records context)
-        (run-state-machine-with-context machine '("start" "finish"))
-      (declare (ignore updated-machine))
-      (assert-event-sequence transition-records '("start" "finish"))
-      (is (equal (context-state context) "completed"))
-      (assert-event-sequence (context-trace context) '("finish" "start")))))
-
-(deftest state-machine-run-with-context-reuses-provided-context
-  (with-state-machine-fixture (machine
-                               :state "idle"
-                               :transitions ((transition "idle" "start" "running")))
-    (let ((context (make-context :state "idle")))
-      (multiple-value-bind (updated-machine transition-records returned-context)
-          (run-state-machine-with-context machine '("start") :context context)
-        (declare (ignore updated-machine))
-        (is (eq returned-context context))
-        (assert-event-sequence transition-records '("start"))
-        (is (equal (context-state context) "running"))
-        (assert-event-sequence (context-trace context) '("start"))))))
-
-(deftest state-machine-run-with-context-creates-default-context
-  (let ((machine (make-state-machine :state "idle"
-                                     :transitions '())))
-    (multiple-value-bind (updated-machine transition-records context)
-        (run-state-machine-with-context machine '())
-      (declare (ignore updated-machine))
-      (is (null transition-records))
-      (is (context-p context))
-      (is (equal (context-state context) "idle"))
-      (is (equal (context-trace context) '())))))

@@ -92,10 +92,10 @@
                   (string-equal (transition-event-type transition) event-type)))
            (%state-machine-transitions-list machine)))
 
-(defun %transition-error-detail (machine event-type)
-  (format nil "No transition from ~A on event ~A"
-          (state-machine-state machine) event-type))
+(defun %transition-error-detail (machine event-type &optional (detail "No transition"))
+  (format nil "~A from ~A on event ~A" detail
+          (state-machine-state machine)
+          event-type))
 
 (defun %guard-error-detail (machine event-type)
-  (format nil "Guard rejected transition from ~A on event ~A"
-          (state-machine-state machine) event-type))
+  (%transition-error-detail machine event-type "Guard rejected transition"))

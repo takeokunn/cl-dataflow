@@ -70,23 +70,43 @@
                       (typep object ',type-name))))
                specs)))
 
-(defmacro define-slot-apis (&body specs)
+(defun %slot-api-clause-forms (clause)
+  (destructuring-bind (kind name object-name slot-name &rest args) clause
+    (ecase kind
+      (:read-only
+       (list `(defun ,name (,object-name)
+                (slot-value ,object-name ',slot-name))))
+      (:copy
+       (destructuring-bind (&optional (copy-form '%copy-structured-value)) args
+         (list `(defun ,name (,object-name)
+                  (,copy-form (slot-value ,object-name ',slot-name)))
+               `(defun (setf ,name) (value ,object-name)
+                  (setf (slot-value ,object-name ',slot-name)
+                        (,copy-form value))))))
+      (:mapcar-copy
+       (destructuring-bind (copier-name) args
+         (list `(defun ,name (,object-name)
+                  (mapcar #',copier-name
+                          (slot-value ,object-name ',slot-name)))
+               `(defun (setf ,name) (value ,object-name)
+                  (setf (slot-value ,object-name ',slot-name)
+                        (mapcar #',copier-name value))))))
+      (:setter-transform
+       (destructuring-bind (transform-form) args
+         (list `(defun (setf ,name) (value ,object-name)
+                  (setf (slot-value ,object-name ',slot-name)
+                        (,transform-form value))))))
+      (:transform
+       (destructuring-bind (getter-form setter-form) args
+         (list `(defun ,name (,object-name)
+                  ,getter-form)
+               `(defun (setf ,name) (value ,object-name)
+                  (setf (slot-value ,object-name ',slot-name)
+                        ,setter-form))))))))
+
+(defmacro define-slot-apis (&body clauses)
   `(progn
-     ,@(mapcan (lambda (spec)
-                 (destructuring-bind (name object-name slot-name
-                                      &key
-                                      (getter `(slot-value ,object-name ',slot-name))
-                                      (setter `(setf (slot-value ,object-name ',slot-name) value))
-                                      writable)
-                     spec
-                   (let ((forms `((defun ,name (,object-name)
-                                    ,getter))))
-                     (if (eq writable :none)
-                         forms
-                         (append forms
-                                 `((defun (setf ,name) (value ,object-name)
-                                     ,setter)))))))
-               specs)))
+     ,@(mapcan #'%slot-api-clause-forms clauses)))
 
 (defun %hash-table-keys (table)
   (let (keys)

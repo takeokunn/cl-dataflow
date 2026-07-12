@@ -65,22 +65,21 @@
   ((first trace-snapshot)
    (first (context-trace-in-order context))))
 
-(define-snapshot-isolation-test context-event-snapshots-are-independent
+(define-snapshot-payload-isolation-test context-event-snapshots-are-independent
   ((boot-event (make-event "boot" :payload '(:id 1)))
    (context (make-context :events (list boot-event))))
   (events-snapshot (context-events-in-order context))
-  (let ((payload (event-payload (first events-snapshot))))
-    (setf (cadr payload) "mutated"))
-  (is (equal (event-payload (first (context-events context))) '(:id 1))))
+  (event-payload (first events-snapshot))
+  (event-payload (first (context-events context)))
+  '(:id 1))
 
-(define-snapshot-isolation-test context-effect-snapshots-are-independent
+(define-snapshot-payload-isolation-test context-effect-snapshots-are-independent
   ((audit-effect (make-effect "audit" :payload '(:message "ok")))
    (context (make-context :effects (list audit-effect))))
   (effects-snapshot (context-effects-in-order context))
-  (let ((payload (effect-payload (first effects-snapshot))))
-    (setf (cadr payload) "mutated"))
-  (is (equal (effect-payload (first (context-effects context)))
-             '(:message "ok"))))
+  (effect-payload (first effects-snapshot))
+  (effect-payload (first (context-effects context)))
+  '(:message "ok"))
 
 (define-snapshot-isolation-test context-trace-snapshots-are-independent
   ((context (make-context :trace (list (list :event "boot"
@@ -90,19 +89,18 @@
   (assert-context-first-trace-entry context
     (:payload '(:id 1))))
 
-(define-snapshot-isolation-test context-last-event-snapshot-is-independent
+(define-snapshot-payload-isolation-test context-last-event-snapshot-is-independent
   ((boot-event (make-event "boot" :payload '(:id 1)))
    (context (make-context :events (list boot-event))))
   (last-event (context-last-event context))
-  (let ((payload (event-payload last-event)))
-    (setf (cadr payload) "mutated"))
-  (is (equal (event-payload (context-last-event context)) '(:id 1))))
+  (event-payload last-event)
+  (event-payload (context-last-event context))
+  '(:id 1))
 
-(define-snapshot-isolation-test context-last-effect-snapshot-is-independent
+(define-snapshot-payload-isolation-test context-last-effect-snapshot-is-independent
   ((audit-effect (make-effect "audit" :payload '(:message "ok")))
    (context (make-context :effects (list audit-effect))))
   (last-effect (context-last-effect context))
-  (let ((payload (effect-payload last-effect)))
-    (setf (cadr payload) "mutated"))
-  (is (equal (effect-payload (context-last-effect context))
-             '(:message "ok"))))
+  (effect-payload last-effect)
+  (effect-payload (context-last-effect context))
+  '(:message "ok"))
