@@ -31,6 +31,7 @@ helpers, all behind a single public package."
                 (:file "streams")
                 (:file "stream-extras")
                 (:file "observability")
+                (:file "effects-ext")
                 (:file "testing"))
   :in-order-to ((test-op (test-op "cl-dataflow/test"))))
 
@@ -63,6 +64,7 @@ helpers, all behind a single public package."
                 (:file "combinators-test")
                 (:file "streams-test")
                 (:file "stream-extras-test")
-                (:file "observability-test"))
+                (:file "observability-test")
+                (:file "effects-ext-test"))
   :perform (test-op (o c)
     (uiop:symbol-call '#:cl-dataflow.test '#:run-tests)))

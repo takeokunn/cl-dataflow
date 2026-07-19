@@ -29,7 +29,8 @@
     :macros
     (define-state-machine
       define-pipeline
-      define-workflow))
+      define-workflow
+      with-effect-handler-scope))
   (:errors
     cl-dataflow-error
     invalid-input-error
@@ -164,7 +165,12 @@
     effect-result
     make-effect
     perform-effect
-    copy-effect)
+    copy-effect
+    register-effect-handler
+    context-effect-handler
+    effect-handled-p
+    context-effect-handler-types
+    with-effect-handler-scope)
   (:state-machine
     state-transition
     state-transition-p

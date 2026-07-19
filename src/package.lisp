@@ -134,6 +134,11 @@
     #:effect-result
     #:make-effect
     #:perform-effect
+    #:register-effect-handler
+    #:context-effect-handler
+    #:effect-handled-p
+    #:context-effect-handler-types
+    #:with-effect-handler-scope
 
     #:state-transition
     #:state-transition-p

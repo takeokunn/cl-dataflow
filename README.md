@@ -33,6 +33,7 @@
 | Streams | Done | A lazy transducer layer (`map`/`filter`/`scan`/`take`/`drop`/`distinct`/`flat-map`/`concat`/`zip`/`tap`) with `collect`/`reduce`/`for-each`/`count`/`first` consumers. |
 | Stream extras | Done | Generators (`iterate`/`repeat`/`cycle`/`enumerate`/`unfold`), windowing (`chunk`/`window`/`partition-by`), and aggregate consumers (`sum`/`min`/`max`/`find`/`some`/`every`/`last`/`nth`). |
 | Observability | Done | Pipeline rendering (`pipeline->dot`/`->mermaid`) and role enumeration, plus `format-trace`, `trace-summary`, and `context-summary` over a run's recorded trace. |
+| Effect ergonomics | Done | `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, and the `with-effect-handler-scope` macro for scoped handler registration. |
 | Protocols | Done | `flow-name`, `flow-metadata`, and `flow-kind` provide consistent introspection across flow objects. |
 | Testing helpers | Done | Dedicated helpers assert emitted events, effects, final state, state-machine state, and pipeline results. |
 | Runnable examples | Done | Scripts cover a simple pipeline, event workflow, state machine, graph analysis, the graph toolkit, state-machine visualization, resilient pipelines, and streams. |
@@ -117,6 +118,7 @@ nix flake check
 - State machine APIs: `make-transition`, `define-state-machine`, `step-state-machine`, `run-state-machine`, `run-state-machine-with-context`, `make-state-machine-node`, `make-state-machine`, `copy-state-machine`, `state-machine-last-transition`, `state-machine-available-transitions`, `state-machine-can-step-p`, `reset-state-machine`, `transition-from`, `transition-event-type`, `transition-to`, `transition-guard`, `transition-action`, `transition-metadata`, `state-machine-state`, `state-machine-initial-state`, `state-machine-transitions`, `state-machine-history`, `state-machine-metadata`
 - Pipeline APIs: `make-pipeline`, `define-pipeline`, `define-workflow`, `copy-pipeline`, `run-pipeline`, `run-pipeline-with-context`, `run-pipeline-sequence`, `pipeline-graph`, `pipeline-stages`, `pipeline-metadata`
 - Observability APIs: `pipeline->dot`, `pipeline->mermaid`, `pipeline-node-names`, `pipeline-stage-names`, `pipeline-source-names`, `pipeline-sink-names`, `format-trace`, `trace-summary`, `context-summary`
+- Effect ergonomics APIs: `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, `with-effect-handler-scope`
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-to-plist`, `plist-to-graph`
 - Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`
