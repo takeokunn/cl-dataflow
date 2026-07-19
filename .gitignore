@@ -31,3 +31,6 @@ system-index.txt
 .DS_Store
 *.swp
 *.swo
+
+# Coverage data file (regenerate with scripts/coverage.sh)
+/cl-dataflow.coverage
