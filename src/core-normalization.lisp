@@ -4,7 +4,17 @@
   (etypecase value
     (string value)
     (symbol (symbol-name value))
-    (t (princ-to-string value))))
+    ;; Non-symbol designators (numbers, characters, ...) are stringified with a
+    ;; fixed printer configuration so a node/port identity never depends on the
+    ;; caller's dynamic *print-* bindings (e.g. *print-base* 16 turning 255 into
+    ;; "FF" and aliasing it onto a different node).
+    (t (let ((*print-base* 10)
+             (*print-radix* nil)
+             (*print-readably* nil)
+             (*print-pretty* nil)
+             (*print-circle* nil)
+             (*print-case* :upcase))
+         (princ-to-string value)))))
 
 (defun %normalize-handler-key (value)
   (string-downcase (%normalize-name value)))

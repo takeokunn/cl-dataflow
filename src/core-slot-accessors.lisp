@@ -62,6 +62,19 @@
 (defun %pipeline-stages-list (pipeline)
   (%read-slot pipeline 'stages))
 
+(defun %slot-api-getter-form (name object-name body)
+  `(defun ,name (,object-name)
+     ,body))
+
+(defun %slot-api-setter-form (name object-name slot-name body)
+  `(defun (setf ,name) (value ,object-name)
+     (setf (slot-value ,object-name ',slot-name)
+           ,body)))
+
+(defun %slot-api-accessor-forms (name object-name slot-name getter-body setter-body)
+  (list (%slot-api-getter-form name object-name getter-body)
+        (%slot-api-setter-form name object-name slot-name setter-body)))
+
 (defmacro define-type-predicates (&body specs)
   `(progn
       ,@(mapcar (lambda (spec)
@@ -74,37 +87,37 @@
   (destructuring-bind (kind name object-name slot-name &rest args) clause
     (ecase kind
       (:read-only
-        (list `(defun ,name (,object-name)
-                (slot-value ,object-name ',slot-name))))
+        (list (%slot-api-getter-form name object-name
+                                     `(slot-value ,object-name ',slot-name))))
       (:copy
         (destructuring-bind (&optional (copy-form '%copy-structured-value)) args
-          (list `(defun ,name (,object-name)
-                  (,copy-form (slot-value ,object-name ',slot-name)))
-                `(defun (setf ,name) (value ,object-name)
-                  (setf (slot-value ,object-name ',slot-name)
-                        (,copy-form value))))))
+          (%slot-api-accessor-forms name
+                                    object-name
+                                    slot-name
+                                    `(,copy-form (slot-value ,object-name ',slot-name))
+                                    `(,copy-form value))))
       (:mapcar-copy
         (destructuring-bind (copier-name) args
-          (list `(defun ,name (,object-name)
-                  (mapcar #',copier-name
-                          (slot-value ,object-name ',slot-name)))
-                `(defun (setf ,name) (value ,object-name)
-                  (setf (slot-value ,object-name ',slot-name)
-                        (mapcar #',copier-name value))))))
+          (%slot-api-accessor-forms name
+                                    object-name
+                                    slot-name
+                                    `(mapcar #',copier-name
+                                             (slot-value ,object-name ',slot-name))
+                                    `(mapcar #',copier-name value))))
       (:setter-transform
         (destructuring-bind (transform-form) args
-          (list `(defun ,name (,object-name)
-                  (slot-value ,object-name ',slot-name))
-                `(defun (setf ,name) (value ,object-name)
-                  (setf (slot-value ,object-name ',slot-name)
-                        (,transform-form value))))))
+          (%slot-api-accessor-forms name
+                                    object-name
+                                    slot-name
+                                    `(slot-value ,object-name ',slot-name)
+                                    `(,transform-form value))))
       (:transform
         (destructuring-bind (getter-form setter-form) args
-          (list `(defun ,name (,object-name)
-                  ,getter-form)
-                `(defun (setf ,name) (value ,object-name)
-                  (setf (slot-value ,object-name ',slot-name)
-                        ,setter-form))))))))
+          (%slot-api-accessor-forms name
+                                    object-name
+                                    slot-name
+                                    getter-form
+                                    setter-form))))))
 
 (defmacro define-slot-apis (&body clauses)
   `(progn
