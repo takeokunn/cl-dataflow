@@ -77,3 +77,20 @@
     (is (= (graph-closeness-centrality graph "b") 2/3))
     ;; A sink reaches nothing.
     (is (= (graph-closeness-centrality graph "d") 0))))
+
+(deftest graph-betweenness-centrality-scores-brokers
+  ;; On the path a->b->c, only the a->c shortest path has an intermediate: b.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c)))
+    (is (equal (graph-betweenness-centrality graph)
+               '(("a" . 0) ("b" . 1) ("c" . 0)))))
+  ;; A diamond splits a->d's two shortest paths, so b and c each carry a half.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    (is (equal (graph-betweenness-centrality graph)
+               '(("a" . 0) ("b" . 1/2) ("c" . 1/2) ("d" . 0)))))
+  ;; a->b, a->c, b->c: b->c is not a shortest path (a->c is direct), exercising the
+  ;; non-shortest-edge branch. No node is ever a broker.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (a c) (b c)))
+    (is (equal (graph-betweenness-centrality graph)
+               '(("a" . 0) ("b" . 0) ("c" . 0))))))

@@ -144,6 +144,7 @@
     graph-eccentricity
     graph-diameter
     graph-closeness-centrality
+    graph-betweenness-centrality
     graph-union
     graph-intersection
     graph-difference

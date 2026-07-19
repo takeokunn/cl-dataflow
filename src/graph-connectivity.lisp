@@ -137,6 +137,53 @@ higher value means NODE reaches the rest of the graph in fewer hops on average."
         0
         (/ (length distances) total))))
 
+(defun graph-betweenness-centrality (graph)
+  "Return an alist (NAME . SCORE) of unnormalised betweenness centrality: for each
+node, the total over all ordered source/target pairs of the fraction of shortest
+paths between them that pass through the node. Computed with Brandes' algorithm over
+unweighted directed edges (iterative BFS plus reverse dependency accumulation, so
+deep graphs are safe). Ordered by name."
+  (let ((names (%graph-node-name-set graph))
+        (successors (%graph-adjacency-snapshot graph :successors))
+        (betweenness (%make-result-table)))
+    (dolist (name names)
+      (setf (gethash name betweenness) 0))
+    (dolist (source names)
+      (let ((stack '())
+            (predecessors (%make-result-table))
+            (sigma (%make-result-table))
+            (distance (%make-result-table))
+            (queue (list source)))
+        (dolist (name names)
+          (setf (gethash name predecessors) '()
+                (gethash name sigma) 0
+                (gethash name distance) -1))
+        (setf (gethash source sigma) 1
+              (gethash source distance) 0)
+        (loop while queue do
+          (let ((v (pop queue)))
+            (push v stack)
+            (dolist (w (gethash v successors))
+              (when (< (gethash w distance) 0)
+                (setf (gethash w distance) (1+ (gethash v distance)))
+                (setf queue (append queue (list w))))
+              (when (= (gethash w distance) (1+ (gethash v distance)))
+                (incf (gethash w sigma) (gethash v sigma))
+                (push v (gethash w predecessors))))))
+        (let ((delta (%make-result-table)))
+          (dolist (name names)
+            (setf (gethash name delta) 0))
+          (dolist (w stack)
+            (dolist (v (gethash w predecessors))
+              (incf (gethash v delta)
+                    (* (/ (gethash v sigma) (gethash w sigma))
+                       (+ 1 (gethash w delta)))))
+            (unless (equal w source)
+              (incf (gethash w betweenness) (gethash w delta)))))))
+    (sort (loop for name being the hash-keys of betweenness using (hash-value score)
+                collect (cons name score))
+          #'string< :key #'car)))
+
 (defun graph-diameter (graph)
   "Return the diameter of GRAPH: the largest eccentricity over all nodes -- the
 longest shortest-path distance between any reachable pair. 0 for a graph with no
