@@ -175,6 +175,19 @@
     #:copy-pipeline
     #:run-pipeline
     #:run-pipeline-with-context
+    #:run-pipeline-sequence
+
+    #:mapping-handler
+    #:compose-handlers
+    #:retrying-handler
+    #:fallback-handler
+    #:memoizing-handler
+    #:tapping-handler
+    #:wrap-node
+    #:node-with-retry
+    #:node-with-fallback
+    #:node-with-memoization
+    #:node-with-tap
 
     #:flow-name
     #:flow-metadata

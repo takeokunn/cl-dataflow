@@ -204,7 +204,20 @@
     define-workflow
     copy-pipeline
     run-pipeline
-    run-pipeline-with-context)
+    run-pipeline-with-context
+    run-pipeline-sequence)
+  (:combinators
+    mapping-handler
+    compose-handlers
+    retrying-handler
+    fallback-handler
+    memoizing-handler
+    tapping-handler
+    wrap-node
+    node-with-retry
+    node-with-fallback
+    node-with-memoization
+    node-with-tap)
   (:protocols
     flow-name
     flow-metadata
