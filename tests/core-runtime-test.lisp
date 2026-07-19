@@ -138,6 +138,8 @@
     graph-self-loop-nodes
     graph-condensation
     graph-distances-from
+    graph-bfs-order
+    graph-dfs-order
     graph-eccentricity
     graph-diameter
     graph-union

@@ -50,3 +50,21 @@
     (is (= (graph-eccentricity graph "d") 0))
     (is (= (graph-diameter graph) 3)))
   (is (= (graph-diameter (make-graph)) 0)))
+
+(deftest graph-bfs-and-dfs-order-traverse-from-a-source
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    ;; BFS visits level by level; DFS descends the name-least branch first.
+    (is (equal (graph-bfs-order graph "a") '("a" "b" "c" "d")))
+    (is (equal (graph-dfs-order graph "a") '("a" "b" "d" "c"))))
+  ;; c is a successor of both a and b, so DFS pushes it onto the stack twice and
+  ;; must skip the already-visited second pop.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (a c) (b c)))
+    (is (equal (graph-dfs-order graph "a") '("a" "b" "c"))))
+  ;; A sink yields just itself.
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b)))
+    (is (equal (graph-bfs-order graph "b") '("b")))
+    (is (equal (graph-dfs-order graph "b") '("b")))
+    (signals node-not-found-error (graph-bfs-order graph "missing"))
+    (signals node-not-found-error (graph-dfs-order graph "missing"))))

@@ -77,6 +77,48 @@ returns to it. Ordered by name."
                   collect (cons name d))
             #'string< :key #'car))))
 
+(defun graph-bfs-order (graph from)
+  "Return the node names reachable from FROM in breadth-first order, starting with
+FROM itself, each appearing once. Ties within a level are broken by name. Iterative,
+so deep graphs are safe."
+  (let ((from-name (%node-designator-name from)))
+    (%ensure-graph-node graph from-name)
+    (let ((successors (%graph-adjacency-snapshot graph :successors))
+          (visited (make-hash-table :test #'equal))
+          (order '())
+          (frontier (list from-name)))
+      (setf (gethash from-name visited) t)
+      (loop while frontier do
+        (let ((next '()))
+          (dolist (name frontier)
+            (push name order)
+            (dolist (successor (gethash name successors))
+              (unless (gethash successor visited)
+                (setf (gethash successor visited) t)
+                (push successor next))))
+          (setf frontier (nreverse next))))
+      (nreverse order))))
+
+(defun graph-dfs-order (graph from)
+  "Return the node names reachable from FROM in depth-first preorder, starting with
+FROM, each appearing once. The name-least successor is descended first. Iterative
+(explicit stack), so deep graphs are safe."
+  (let ((from-name (%node-designator-name from)))
+    (%ensure-graph-node graph from-name)
+    (let ((successors (%graph-adjacency-snapshot graph :successors))
+          (visited (make-hash-table :test #'equal))
+          (order '())
+          (stack (list from-name)))
+      (loop while stack do
+        (let ((name (pop stack)))
+          (unless (gethash name visited)
+            (setf (gethash name visited) t)
+            (push name order)
+            (dolist (successor (reverse (gethash name successors)))
+              (unless (gethash successor visited)
+                (push successor stack))))))
+      (nreverse order))))
+
 (defun graph-eccentricity (graph node)
   "Return the eccentricity of NODE: the greatest hop distance to any node reachable
 from it, or 0 when NODE reaches nothing."
