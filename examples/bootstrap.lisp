@@ -42,6 +42,7 @@
     "src/context-serialization.lisp"
     "src/equality-predicates.lisp"
     "src/reactive.lisp"
+    "src/reactive-ops.lisp"
     "src/testing.lisp"))
 
 (defun use-interpreted-loading-when-available ()

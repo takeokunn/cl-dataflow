@@ -1,0 +1,107 @@
+(in-package #:cl-dataflow)
+
+;;;; Stateful and combining operators over reactive subjects, bringing the
+;;;; push-based side toward parity with the pull-based stream operators. Each
+;;;; returns a derived subject that subscribes to its source(s) and re-emits;
+;;;; per-operator state lives in the closure. Everything is synchronous, so an
+;;;; emission propagates through the whole derived graph before EMIT returns.
+
+(defun subject-scan (subject function seed)
+  "Return a derived subject that emits a running accumulation: starting from SEED,
+each source value V produces and emits (FUNCALL FUNCTION ACCUMULATOR V)."
+  (let ((result (make-subject))
+        (accumulator seed))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (setf accumulator (funcall function accumulator value))
+                         (subject-emit result accumulator)))
+    result))
+
+(defun subject-distinct (subject &key (test 'equal))
+  "Return a derived subject that re-emits only values not previously emitted (under
+TEST). Runs in O(n) membership per emission."
+  (let ((result (make-subject))
+        (seen '()))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (unless (member value seen :test test)
+                           (push value seen)
+                           (subject-emit result value))))
+    result))
+
+(defun subject-tap (subject function)
+  "Return a derived subject that calls FUNCTION on each source value for its side
+effect, then re-emits the value unchanged."
+  (let ((result (make-subject)))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (funcall function value)
+                         (subject-emit result value)))
+    result))
+
+(defun subject-take (subject n)
+  "Return a derived subject that re-emits only the first N values of SUBJECT and
+ignores the rest."
+  (let ((result (make-subject))
+        (remaining n))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (when (plusp remaining)
+                           (decf remaining)
+                           (subject-emit result value))))
+    result))
+
+(defun subject-zip (subject-a subject-b)
+  "Return a derived subject that pairs values of SUBJECT-A and SUBJECT-B in
+lockstep, emitting (A . B) once the Nth value of each has arrived. Values queue
+until their counterpart arrives."
+  (let ((result (make-subject))
+        (queue-a '())
+        (queue-b '()))
+    (flet ((emit-if-ready ()
+             (when (and queue-a queue-b)
+               (let ((value-a (first queue-a))
+                     (value-b (first queue-b)))
+                 (setf queue-a (rest queue-a)
+                       queue-b (rest queue-b))
+                 (subject-emit result (cons value-a value-b))))))
+      (subject-subscribe subject-a
+                         (lambda (value)
+                           (setf queue-a (append queue-a (list value)))
+                           (emit-if-ready)))
+      (subject-subscribe subject-b
+                         (lambda (value)
+                           (setf queue-b (append queue-b (list value)))
+                           (emit-if-ready))))
+    result))
+
+(defun subject-combine-latest (subject-a subject-b)
+  "Return a derived subject that emits (LATEST-A . LATEST-B) whenever either source
+emits, once both have emitted at least once."
+  (let ((result (make-subject))
+        (latest-a nil) (has-a nil)
+        (latest-b nil) (has-b nil))
+    (flet ((emit-combined ()
+             (when (and has-a has-b)
+               (subject-emit result (cons latest-a latest-b)))))
+      (subject-subscribe subject-a
+                         (lambda (value) (setf latest-a value has-a t) (emit-combined)))
+      (subject-subscribe subject-b
+                         (lambda (value) (setf latest-b value has-b t) (emit-combined))))
+    result))
+
+(defun subject-buffer (subject n)
+  "Return a derived subject that collects every N source values into a list and
+emits that list. A trailing partial buffer is not emitted. N must be positive."
+  (%positive-size n "SUBJECT-BUFFER")
+  (let ((result (make-subject))
+        (buffer '())
+        (count 0))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (push value buffer)
+                         (incf count)
+                         (when (= count n)
+                           (subject-emit result (reverse buffer))
+                           (setf buffer '() count 0))))
+    result))

@@ -290,6 +290,13 @@
     #:subject-filter
     #:subject-merge
     #:subject-collect
+    #:subject-scan
+    #:subject-distinct
+    #:subject-tap
+    #:subject-take
+    #:subject-zip
+    #:subject-combine-latest
+    #:subject-buffer
 
     #:flow-stream-p
     #:empty-stream

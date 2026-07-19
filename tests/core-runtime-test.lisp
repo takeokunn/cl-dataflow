@@ -320,7 +320,14 @@
     subject-map
     subject-filter
     subject-merge
-    subject-collect)
+    subject-collect
+    subject-scan
+    subject-distinct
+    subject-tap
+    subject-take
+    subject-zip
+    subject-combine-latest
+    subject-buffer)
   (:streams
     flow-stream-p
     empty-stream

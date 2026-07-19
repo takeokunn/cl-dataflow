@@ -49,6 +49,7 @@ helpers, all behind a single public package."
                 (:file "context-serialization")
                 (:file "equality-predicates")
                 (:file "reactive")
+                (:file "reactive-ops")
                 (:file "testing"))
   :in-order-to ((test-op (test-op "cl-dataflow/test"))))
 
@@ -99,6 +100,7 @@ helpers, all behind a single public package."
                 (:file "introspection-test")
                 (:file "context-serialization-test")
                 (:file "equality-predicates-test")
-                (:file "reactive-test"))
+                (:file "reactive-test")
+                (:file "reactive-ops-test"))
   :perform (test-op (o c)
     (uiop:symbol-call '#:cl-dataflow.test '#:run-tests)))
