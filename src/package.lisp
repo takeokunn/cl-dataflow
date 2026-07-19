@@ -127,6 +127,8 @@
     #:context-summary
     #:format-trace
     #:trace-summary
+    #:context-merge
+    #:context-trace-of-kind
 
     #:event
     #:event-p
@@ -136,6 +138,8 @@
     #:event-trace-index
     #:make-event
     #:emit-event
+    #:emit-events
+    #:event-of-type-p
 
     #:effect
     #:effect-p
@@ -151,6 +155,10 @@
     #:effect-handled-p
     #:context-effect-handler-types
     #:with-effect-handler-scope
+    #:perform-effects
+    #:context-effect-results
+    #:context-effect-results-of-type
+    #:effect-of-type-p
 
     #:state-transition
     #:state-transition-p
@@ -191,6 +199,13 @@
     #:state-machine-run-states
     #:state-machine-accepts-p
     #:state-machine-event-path
+    #:state-machine-to-plist
+    #:plist-to-state-machine
+    #:state-machine-complete-p
+    #:state-machine-transition-for
+    #:add-transition
+    #:remove-transition
+    #:state-machine-relabel-state
 
     #:pipeline
     #:pipeline-p
@@ -210,6 +225,12 @@
     #:pipeline-stage-names
     #:pipeline-source-names
     #:pipeline-sink-names
+    #:pipeline-to-plist
+    #:plist-to-pipeline
+    #:pipeline-validate
+    #:pipeline-stage-count
+    #:map-pipeline
+    #:pipeline->node
 
     #:mapping-handler
     #:compose-handlers
@@ -226,6 +247,8 @@
     #:flow-name
     #:flow-metadata
     #:flow-kind
+    #:flow-describe
+    #:flow-children
 
     #:flow-stream-p
     #:empty-stream
