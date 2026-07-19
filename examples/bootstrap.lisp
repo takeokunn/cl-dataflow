@@ -17,9 +17,21 @@
     "src/pipeline.lisp"
     "src/graph-algorithms.lisp"
     "src/graph-export.lisp"
+    "src/graph-builders.lisp"
+    "src/graph-paths.lisp"
+    "src/graph-metrics.lisp"
     "src/state-machine-analysis.lisp"
+    "src/state-machine-execution.lisp"
+    "src/state-machine-builders.lisp"
     "src/combinators.lisp"
     "src/streams.lisp"
+    "src/stream-extras.lisp"
+    "src/stream-ops.lisp"
+    "src/observability.lisp"
+    "src/effects-ext.lisp"
+    "src/pipeline-ext.lisp"
+    "src/events-ext.lisp"
+    "src/introspection.lisp"
     "src/testing.lisp"))
 
 (defun use-interpreted-loading-when-available ()
