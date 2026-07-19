@@ -60,3 +60,33 @@
     ;; (1 2) and (3 4); the trailing 5 stays buffered.
     (is (equal (funcall collector) '((1 2) (3 4))))
     (signals invalid-input-error (subject-buffer source 0))))
+
+(deftest subject-drop-skips-the-first-n
+  (let* ((source (make-subject))
+         (dropped (subject-drop source 2))
+         (collector (subject-collect dropped)))
+    (dolist (value '(10 20 30 40)) (subject-emit source value))
+    (is (equal (funcall collector) '(30 40)))))
+
+(deftest subject-take-while-stops-at-first-failure
+  (let* ((source (make-subject))
+         (taken (subject-take-while source (lambda (x) (< x 3))))
+         (collector (subject-collect taken)))
+    ;; 1,2 pass; 3 fails and stops forever, so the later 1 is not re-emitted.
+    (dolist (value '(1 2 3 1)) (subject-emit source value))
+    (is (equal (funcall collector) '(1 2)))))
+
+(deftest subject-drop-while-forwards-after-first-failure
+  (let* ((source (make-subject))
+         (kept (subject-drop-while source (lambda (x) (< x 3))))
+         (collector (subject-collect kept)))
+    ;; 1,2 dropped; from 3 on everything is forwarded, including the later 1.
+    (dolist (value '(1 2 3 1)) (subject-emit source value))
+    (is (equal (funcall collector) '(3 1)))))
+
+(deftest subject-count-emits-running-total
+  (let* ((source (make-subject))
+         (counted (subject-count source))
+         (collector (subject-collect counted)))
+    (dolist (value '(:a :b :c)) (subject-emit source value))
+    (is (equal (funcall collector) '(1 2 3)))))

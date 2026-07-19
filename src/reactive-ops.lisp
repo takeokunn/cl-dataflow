@@ -105,3 +105,53 @@ emits that list. A trailing partial buffer is not emitted. N must be positive."
                            (subject-emit result (reverse buffer))
                            (setf buffer '() count 0))))
     result))
+
+(defun subject-drop (subject n)
+  "Return a derived subject that ignores the first N source values and re-emits the
+rest. The push-side dual of STREAM-DROP."
+  (let ((result (make-subject))
+        (remaining n))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (if (plusp remaining)
+                             (decf remaining)
+                             (subject-emit result value))))
+    result))
+
+(defun subject-take-while (subject predicate)
+  "Return a derived subject that re-emits the leading run of source values
+satisfying PREDICATE and permanently stops at (and excluding) the first that does
+not."
+  (let ((result (make-subject))
+        (active t))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (when active
+                           (if (funcall predicate value)
+                               (subject-emit result value)
+                               (setf active nil)))))
+    result))
+
+(defun subject-drop-while (subject predicate)
+  "Return a derived subject that drops the leading run of source values satisfying
+PREDICATE, then re-emits every value from the first that does not onward."
+  (let ((result (make-subject))
+        (dropping t))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (unless (and dropping (funcall predicate value))
+                           (setf dropping nil)
+                           (subject-emit result value))))
+    result))
+
+(defun subject-count (subject)
+  "Return a derived subject that emits the running count of source emissions
+(1, 2, 3, ...)."
+  (let ((result (make-subject))
+        (count 0))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (declare (ignore value))
+                         (incf count)
+                         (subject-emit result count)))
+    result))

@@ -297,6 +297,10 @@
     #:subject-zip
     #:subject-combine-latest
     #:subject-buffer
+    #:subject-drop
+    #:subject-take-while
+    #:subject-drop-while
+    #:subject-count
 
     #:flow-stream-p
     #:empty-stream

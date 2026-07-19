@@ -327,7 +327,11 @@
     subject-take
     subject-zip
     subject-combine-latest
-    subject-buffer)
+    subject-buffer
+    subject-drop
+    subject-take-while
+    subject-drop-while
+    subject-count)
   (:streams
     flow-stream-p
     empty-stream
