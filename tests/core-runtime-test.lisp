@@ -107,7 +107,11 @@
     graph-strongly-connected-components
     graph-connected-components
     graph-topological-generations
-    graph-distance)
+    graph-distance
+    graph->dot
+    graph->mermaid
+    graph-to-plist
+    plist-to-graph)
   (:context
     context
     context-p

@@ -80,6 +80,10 @@
     #:graph-connected-components
     #:graph-topological-generations
     #:graph-distance
+    #:graph->dot
+    #:graph->mermaid
+    #:graph-to-plist
+    #:plist-to-graph
 
     #:context
     #:context-p
