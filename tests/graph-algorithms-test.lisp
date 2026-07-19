@@ -96,6 +96,15 @@
     (is (equal (graph-connected-components graph)
                '(("a") ("b"))))))
 
+(deftest connected-components-handle-bidirectional-edges
+  ;; a and b point at each other, so each is both a successor and a predecessor of
+  ;; the other -- the undirected neighbour set must deduplicate them.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b a)))
+    (is (equal (graph-connected-components graph)
+               '(("a" "b") ("c"))))))
+
 (deftest topological-generations-layer-a-dag
   (with-graph-fixture (graph
                        ((s "s") (a "a") (b "b") (z "t"))
@@ -129,3 +138,15 @@
                        ((a "a") (b "b"))
                        :edges ((a b)))
     (is (null (graph-distance graph "a" "a")))))
+
+(deftest graph-distance-over-a-diamond-converges
+  ;; d is reachable from a through both b and c; BFS must reach it via one and
+  ;; then skip the already-discovered node on the other path.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    (is (= (graph-distance graph "a" "d") 2))))
+
+(deftest graph-distance-on-an-edgeless-graph-is-nil
+  (with-graph-fixture (graph ((a "a") (b "b")))
+    (is (null (graph-distance graph "a" "b")))))

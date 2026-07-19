@@ -231,10 +231,11 @@ through a cycle, matching GRAPH-PATH / GRAPH-REACHABLE-P."
             (distance (make-hash-table :test #'equal))
             (frontier '())
             (depth 1))
+        ;; FROM's direct successors are distinct (adjacency deduplicates), and
+        ;; DISTANCE starts empty, so every seed is new -- no presence guard needed.
         (dolist (successor (gethash from-name successors))
-          (unless (gethash successor distance)
-            (setf (gethash successor distance) depth)
-            (push successor frontier)))
+          (setf (gethash successor distance) depth)
+          (push successor frontier))
         (setf frontier (nreverse frontier))
         (loop
           (when (gethash to-name distance)

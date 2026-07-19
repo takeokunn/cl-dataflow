@@ -66,6 +66,14 @@
                     (list input (typep condition 'error))))))
     (is (equal (funcall wrapped 7 nil) '(7 t)))))
 
+(deftest fallback-handler-propagates-unmatched-conditions
+  ;; Only invalid-input-error is caught; a plain error must propagate.
+  (let ((wrapped (fallback-handler
+                  (lambda (i c) (declare (ignore i c)) (error "plain"))
+                  :ignored
+                  :condition-type 'invalid-input-error)))
+    (signals error (funcall wrapped 1 nil))))
+
 (deftest memoizing-handler-caches-by-key
   (let* ((calls 0)
          (wrapped (memoizing-handler (lambda (i c)
@@ -122,6 +130,32 @@
       (is (= (run-pipeline pipeline :input 6) 36))
       (is (= (run-pipeline pipeline :input 6) 36))
       (is (= calls 1)))))
+
+(deftest node-with-retry-recovers-in-a-pipeline
+  (let* ((calls 0)
+         (base (make-node "fetch"
+                          :handler (lambda (input context)
+                                     (declare (ignore context))
+                                     (incf calls)
+                                     (if (< calls 2) (error "flaky") (* input 3)))))
+         (graph (make-graph)))
+    (add-node graph (node-with-retry base :attempts 4 :condition-type 'error))
+    (is (= (run-pipeline (make-pipeline :graph graph) :input 5) 15))
+    (is (= calls 2))))
+
+(deftest node-with-tap-observes-pipeline-output
+  (let* ((seen '())
+         (base (make-node "double"
+                          :handler (lambda (input context)
+                                     (declare (ignore context))
+                                     (* input 2))))
+         (graph (make-graph)))
+    (add-node graph
+              (node-with-tap base (lambda (input output context)
+                                    (declare (ignore context))
+                                    (push (cons input output) seen))))
+    (is (= (run-pipeline (make-pipeline :graph graph) :input 8) 16))
+    (is (equal seen '((8 . 16))))))
 
 ;;; --- Pipeline composition ------------------------------------------------
 

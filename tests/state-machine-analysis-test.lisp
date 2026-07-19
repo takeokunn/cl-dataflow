@@ -65,3 +65,32 @@
       ;; idle sorts before running, so idle is s0 and running is s1.
       (is (search "state \"idle\" as s0" mermaid))
       (is (search "s0 --> s1: start" mermaid)))))
+
+(deftest state-machine-successor-table-deduplicates-parallel-transitions
+  ;; Two transitions go draft -> review on different events; reachability must
+  ;; treat draft -> review as a single successor edge, not double-count it.
+  (with-state-machine-fixture (machine
+                               :state "draft"
+                               :transitions ((submit "draft" "submit" "review")
+                                             (resubmit "draft" "resubmit" "review")
+                                             (approve "review" "approve" "done")))
+    (is (equal (state-machine-reachable-states machine) '("done" "draft" "review")))
+    ;; Distinct events on parallel draft -> review edges keep it structurally
+    ;; deterministic (the (from, event) pairs differ).
+    (is (state-machine-deterministic-p machine))))
+
+(deftest state-machine-rendering-orders-multiple-transitions
+  ;; Exercises the transition-sort path with several transitions to render.
+  (with-state-machine-fixture (machine
+                               :state "a"
+                               :transitions ((t1 "a" "go" "b")
+                                             (t2 "b" "go" "c")
+                                             (t3 "a" "skip" "c")))
+    (let ((dot (state-machine->dot machine)))
+      ;; Sorted by (from, event, to): a/go/b, a/skip/c, b/go/c.
+      (is (< (search "\"a\" -> \"b\"" dot)
+             (search "\"a\" -> \"c\"" dot)))
+      (is (< (search "\"a\" -> \"c\"" dot)
+             (search "\"b\" -> \"c\"" dot))))
+    ;; a=s0, b=s1, c=s2; the b -> c transition renders as s1 --> s2.
+    (is (search "s1 --> s2: go" (state-machine->mermaid machine)))))

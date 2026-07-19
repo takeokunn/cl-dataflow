@@ -5,19 +5,23 @@
 ;;;; the output of GRAPH->DOT / GRAPH->MERMAID / GRAPH-TO-PLIST is stable across
 ;;;; runs and safe to diff or golden-test.
 
+;;; Rendering order is fixed by decorating each item with a single NUL-joined
+;;; string key and sorting under STRING<. This gives a stable total order without
+;;; a hand-written multi-key comparator, whose string>/all-equal branches are
+;;; unreachable when the items (edges, transitions) are already pairwise distinct.
+
+(defun %edge-sort-key (edge)
+  (format nil "~A~C~A~C~A~C~A"
+          (edge-from edge) #\Nul (edge-from-port edge) #\Nul
+          (edge-to edge) #\Nul (edge-to-port edge)))
+
 (defun %sorted-edge-snapshots (graph)
   "Edge copies of GRAPH ordered by (from, from-port, to, to-port) for stable output."
-  (sort (mapcar #'%copy-edge-snapshot (%graph-edges-list graph))
-        (lambda (left right)
-          (let ((left-key (list (edge-from left) (edge-from-port left)
-                                (edge-to left) (edge-to-port left)))
-                (right-key (list (edge-from right) (edge-from-port right)
-                                 (edge-to right) (edge-to-port right))))
-            (loop for l in left-key
-                  for r in right-key
-                  do (cond ((string< l r) (return t))
-                           ((string> l r) (return nil)))
-                  finally (return nil))))))
+  (mapcar #'cdr
+          (sort (mapcar (lambda (edge)
+                          (cons (%edge-sort-key edge) (%copy-edge-snapshot edge)))
+                        (%graph-edges-list graph))
+                #'string< :key #'car)))
 
 (defun %replace-substring (string old new)
   (with-output-to-string (out)

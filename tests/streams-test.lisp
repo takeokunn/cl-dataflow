@@ -34,13 +34,17 @@
   (is (equal (stream-collect (stream-take 3 (stream-range 0 100))) '(0 1 2)))
   (is (equal (stream-collect (stream-drop 2 (stream-of 1 2 3 4))) '(3 4)))
   (is (null (stream-collect (stream-take 0 (stream-of 1 2)))))
+  ;; Taking more than the source holds stops when the source is exhausted.
+  (is (equal (stream-collect (stream-take 5 (stream-of 1 2))) '(1 2)))
   (is (null (stream-collect (stream-drop 5 (stream-of 1 2))))))
 
 (deftest stream-take-while-and-drop-while
   (is (equal (stream-collect (stream-take-while (lambda (x) (< x 3)) (stream-of 1 2 3 1)))
              '(1 2)))
   (is (equal (stream-collect (stream-drop-while (lambda (x) (< x 3)) (stream-of 1 2 3 1)))
-             '(3 1))))
+             '(3 1)))
+  ;; drop-while whose predicate never fails drains the whole stream.
+  (is (null (stream-collect (stream-drop-while (constantly t) (stream-of 1 2 3))))))
 
 (deftest stream-distinct-keeps-first-occurrences
   (is (equal (stream-collect (stream-distinct (stream-of 1 2 1 3 2 4)))

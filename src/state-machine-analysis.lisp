@@ -96,19 +96,22 @@ on guards rather than on the (state, event) pair alone."
           (return nil))
         (setf (gethash key seen) t)))))
 
+(defun %transition-sort-key (transition)
+  ;; A single NUL-joined key sorted under STRING< gives a stable total order
+  ;; without a multi-key comparator whose string>/all-equal branches are
+  ;; unreachable for pairwise-distinct transitions.
+  (format nil "~A~C~A~C~A"
+          (transition-from transition) #\Nul
+          (transition-event-type transition) #\Nul
+          (transition-to transition)))
+
 (defun %sorted-transition-snapshots (machine)
   "Transition copies ordered by (from, event-type, to) for stable rendering."
-  (sort (%state-machine-transitions-list machine)
-        (lambda (left right)
-          (let ((left-key (list (transition-from left) (transition-event-type left)
-                                (transition-to left)))
-                (right-key (list (transition-from right) (transition-event-type right)
-                                 (transition-to right))))
-            (loop for l in left-key
-                  for r in right-key
-                  do (cond ((string< l r) (return t))
-                           ((string> l r) (return nil)))
-                  finally (return nil))))))
+  (mapcar #'cdr
+          (sort (mapcar (lambda (transition)
+                          (cons (%transition-sort-key transition) transition))
+                        (%state-machine-transitions-list machine))
+                #'string< :key #'car)))
 
 (defun state-machine->dot (machine &key (name "S"))
   "Render MACHINE as a Graphviz DOT digraph. States are nodes, transitions are
