@@ -51,7 +51,7 @@
   `(setf (%read-slot ,context 'trace) ,new-trace))
 
 (defun %context-trace-count (context)
-  (length (%context-trace-list context)))
+  (slot-value context 'trace-count))
 
 (defun %state-machine-history-list (machine)
   (%read-slot machine 'history))

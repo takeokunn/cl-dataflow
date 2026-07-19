@@ -69,6 +69,24 @@
     (signals graph-cycle-error
       (topological-sort graph))))
 
+(deftest graph-source-and-sink-nodes-stay-inspectable-on-a-cyclic-graph
+  ;; graph-source-nodes/sink-nodes only need indegree/successor membership, not
+  ;; topological order, so a legally constructed cycle must not make them raise
+  ;; graph-cycle-error -- the same inspectability GRAPH-NODES/GRAPH-EDGES keep
+  ;; on cyclic graphs.
+  (with-graph-fixture (graph ((head "head")
+                              (a "a")
+                              (b "b")
+                              (tail "tail"))
+                        :edges ((head a)
+                                (a b)
+                                (b a)
+                                (b tail)))
+    (assert-node-order (graph-source-nodes graph) '("head"))
+    (assert-node-order (graph-sink-nodes graph) '("tail"))
+    (signals graph-cycle-error
+      (topological-sort graph))))
+
 (deftest graph-cycle-error-exposes-cyclic-nodes
   (with-graph-fixture (graph ((a "a")
                               (b "b"))

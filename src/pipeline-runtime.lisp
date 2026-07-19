@@ -54,8 +54,8 @@
   (push (%make-node-trace-record node node-input bindings)
         (%context-trace-list context)))
 
-(defun %run-node/cps (context graph node input continuation)
-  (let* ((node-input (%collect-node-inputs context graph node input))
+(defun %run-node/cps (context graph node input incoming-index continuation)
+  (let* ((node-input (%collect-node-inputs context graph node input incoming-index))
          (output (funcall (node-handler node) node-input context))
          (bindings (%node-output-bindings node output)))
     (%record-node-run context node node-input bindings)
@@ -69,17 +69,21 @@
   (or context (make-context)))
 
 (defun %run-pipeline-stages/cps (context graph order input continuation)
-  (labels ((advance-stages (remaining)
-             (if (endp remaining)
-                 (funcall continuation (%finalize-pipeline-run graph context order))
-                 (%run-node/cps context
-                                graph
-                                (first remaining)
-                                input
-                                (lambda (output)
-                                  (declare (ignore output))
-                                  (advance-stages (rest remaining)))))))
-    (advance-stages order)))
+  ;; The incoming-edge index is built once per pipeline run (O(E)) instead of
+  ;; once per node (O(V*E) total for a run through V stages).
+  (let ((incoming-index (%incoming-edges-index graph)))
+    (labels ((advance-stages (remaining)
+               (if (endp remaining)
+                   (funcall continuation (%finalize-pipeline-run graph context order))
+                   (%run-node/cps context
+                                  graph
+                                  (first remaining)
+                                  input
+                                  incoming-index
+                                  (lambda (output)
+                                    (declare (ignore output))
+                                    (advance-stages (rest remaining)))))))
+      (advance-stages order))))
 
 (defun run-pipeline (pipeline &key input context)
   (let* ((graph (pipeline-graph pipeline))

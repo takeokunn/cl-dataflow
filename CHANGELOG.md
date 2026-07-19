@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bumped the pinned `cl-weave` flake input to its latest revision (a docs-only fix on top of v0.8.0); `cl-prolog` was already current at v0.6.0.
+- Fixed pipeline input binding for nodes with more than one incoming edge on the same port: resolution now deterministically prefers the most recently added edge instead of an insertion-order accident that silently favoured the oldest one.
+- Fixed `graph-source-nodes` and `graph-sink-nodes` to stay inspectable on a legally constructed cyclic graph instead of raising `graph-cycle-error`, matching the inspectability `graph-nodes`/`graph-edges` already guarantee; they no longer route through `topological-sort` internally, since source/sink membership only depends on indegree and successor counts.
+- Cut `run-pipeline` from O(V*E) to O(V+E) per run by building the incoming-edge index once per pipeline execution instead of rescanning the full edge list for every stage.
+- Cut `context-last-event`/`context-last-effect` from O(n) (copy, reverse, and re-copy the whole history) to O(1) by reading the most recent entry directly off the raw newest-first storage list.
+- Cut event/effect `trace-index` allocation from O(n) to O(1) per call by tracking a running trace-count slot instead of re-deriving it from `(length trace)` on every `emit-event`/`perform-effect`/state-machine transition; all trace-list mutation now goes through a single `%push-context-trace-entry` append point so the counter cannot drift from the list.
 - Added `graph-descendants` and `graph-ancestors` public readers that return every node reachable from (respectively, able to reach) a given node, as name-ordered node snapshots. They reuse the bulk-query adjacency traversal, so they are linear and terminate on cyclic graphs, and are cross-checked against a reference transitive closure in the property suite.
 - Added `graph-path`, which returns the node names of a shortest witnessing path between two nodes (or `NIL` when unreachable) via breadth-first search over the same adjacency, completing the reachability API family and property-checked for validity and agreement with `graph-reachable-p`.
 - Upgraded the pinned `cl-prolog` (0.6.0) and `cl-weave` (0.8.0) dependencies to their latest revisions.

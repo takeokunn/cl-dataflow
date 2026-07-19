@@ -65,9 +65,7 @@
 
 (defun %record-context-trace (context transition-record)
   (when context
-    (setf (slot-value context 'trace)
-          (cons (%copy-transition-record transition-record)
-                (%context-trace-list context)))))
+    (%push-context-trace-entry context (%copy-transition-record transition-record))))
 
 (defun %commit-transition/cps (machine context transition event-type previous-state next-state action-result continuation)
   (let ((transition-record (%make-transition-record transition

@@ -5,22 +5,39 @@
                     (equal (edge-to edge) node-name))
                   (%graph-edges-list graph)))
 
+(defun %incoming-edges-index (graph)
+  "Map of node-name -> incoming edges, newest-first per node (matching
+%INCOMING-EDGES' order, which %EDGE-BINDING-TABLE relies on to break ties
+toward the most recently added edge). Built with a single O(E) pass over the
+edge list instead of one O(E) %incoming-edges scan per node: walking the
+oldest-first REVERSE of the (already newest-first) edge list and pushing onto
+each node's bucket leaves the newest edge at the front of that bucket."
+  (let ((index (%make-result-table)))
+    (dolist (edge (reverse (%graph-edges-list graph)))
+      (push edge (gethash (edge-to edge) index)))
+    index))
+
 (defun %boundary-nodes (graph boundary-key)
-  "Copies of the graph's source (BOUNDARY-KEY :source) or sink (:sink) nodes in
-topological order. Boundaries are read from a single adjacency snapshot -- a node
-with indegree 0 is a source, a node with no successors is a sink -- instead of a
-Prolog query per node."
-  (let ((rulebase (%graph-rulebase graph)))
+  "Copies of the graph's source (BOUNDARY-KEY :source) or sink (:sink) nodes,
+name-ordered. Boundaries are read from a single adjacency snapshot -- a node
+with indegree 0 is a source, a node with no successors is a sink -- instead of
+a Prolog query per node. This deliberately does not route through
+TOPOLOGICAL-SORT: source/sink membership never depends on topological order,
+and requiring acyclicity here would make a legally constructed cyclic graph's
+boundaries uninspectable, the same gap GRAPH-NODES/GRAPH-EDGES were fixed to
+avoid."
+  (let* ((rulebase (%graph-rulebase graph))
+         (nodes (%graph-nodes-table graph)))
     (multiple-value-bind (successors indegree)
         (%graph-adjacency graph rulebase)
-      (mapcar #'%copy-node-snapshot
-              (remove-if-not
-                (lambda (node)
-                  (let ((name (node-name node)))
-                    (ecase boundary-key
-                      (:source (zerop (gethash name indegree)))
-                      (:sink (null (gethash name successors))))))
-                (topological-sort graph))))))
+      (mapcar (lambda (name) (%copy-node-snapshot (gethash name nodes)))
+              (sort (remove-if-not
+                      (lambda (name)
+                        (ecase boundary-key
+                          (:source (zerop (gethash name indegree)))
+                          (:sink (null (gethash name successors)))))
+                      (%hash-table-keys nodes))
+                    #'string<)))))
 
 (defun graph-source-nodes (graph)
   (%boundary-nodes graph :source))

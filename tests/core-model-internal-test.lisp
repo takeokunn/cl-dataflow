@@ -45,6 +45,32 @@
                (list (cons "LEFT" 1)
                      (cons "RIGHT" 2))))))
 
+(deftest internal-collect-node-inputs-resolves-multiple-producers-on-one-port-to-the-newest-edge
+  ;; The graph layer allows more than one edge into the same (node . port) --
+  ;; it is also used standalone for reachability/topology, where fan-in is
+  ;; ordinary in-degree, not a pipeline binding conflict (see add-edge). When
+  ;; such a graph is actually run as a pipeline, %edge-binding-table must
+  ;; resolve the ambiguity deterministically: the most recently added edge
+  ;; wins. This must hold both when %collect-node-inputs derives incoming
+  ;; edges itself and when run-pipeline's precomputed index is passed in.
+  (let* ((graph (make-graph))
+         (a (make-node "a" :outputs '("value")))
+         (b (make-node "b" :outputs '("value")))
+         (sink (make-node "sink" :inputs '("value")))
+         (context (make-context)))
+    (dolist (node (list a b sink))
+      (add-node graph node))
+    (add-edge graph a sink)
+    (add-edge graph b sink)
+    (cl-dataflow::%store-value context (node-name a) "value" 1)
+    (cl-dataflow::%store-value context (node-name b) "value" 2)
+    (is (= (cl-dataflow::%collect-node-inputs context graph sink :ignored)
+           2))
+    (is (= (cl-dataflow::%collect-node-inputs
+            context graph sink :ignored
+            (cl-dataflow::%incoming-edges-index graph))
+           2))))
+
 (deftest internal-collect-sink-results-collapses-single-and-branching-sinks
   (let* ((graph (make-graph))
          (source (make-node "source" :outputs '("left" "right")))

@@ -21,7 +21,6 @@
 
 (define-slot-apis
   (:copy context-values context values %copy-result-table)
-  (:copy context-trace context trace %copy-structured-value)
   (:copy context-result context result %copy-structured-value)
   (:mapcar-copy context-events context events %copy-event)
   (:mapcar-copy context-effects context effects %copy-effect)
@@ -31,6 +30,17 @@
   (:transform context-metadata context metadata
               (copy-tree (slot-value context 'metadata))
               (%normalize-metadata value)))
+
+(defun context-trace (context)
+  (%copy-structured-value (slot-value context 'trace)))
+
+(defun (setf context-trace) (value context)
+  ;; Hand-written (not via DEFINE-SLOT-APIS) so replacing the trace list wholesale
+  ;; keeps TRACE-COUNT -- and therefore future TRACE-INDEX allocation -- in sync.
+  (let ((copied (%copy-structured-value value)))
+    (setf (slot-value context 'trace) copied
+          (slot-value context 'trace-count) (length copied))
+    copied))
 
 (defun context-events-in-order (context)
   (reverse (context-events context)))
@@ -59,16 +69,19 @@
                       (equal (effect-type effect) normalized))
                     (context-effects-in-order context))))
 
-(defun %last-copied-item (items copier)
-  (let ((item (first (last items))))
+(defun %last-raw-item (items copier)
+  ;; ITEMS is the raw, newest-first storage list (see EMIT-EVENT/PERFORM-EFFECT),
+  ;; so the most recent item is the head -- no need to copy/reverse/walk the
+  ;; whole history just to read one entry.
+  (let ((item (first items)))
     (when item
       (funcall copier item))))
 
 (defun context-last-event (context)
-  (%last-copied-item (context-events-in-order context) #'%copy-event))
+  (%last-raw-item (%context-events-list context) #'%copy-event))
 
 (defun context-last-effect (context)
-  (%last-copied-item (context-effects-in-order context) #'%copy-effect))
+  (%last-raw-item (%context-effects-list context) #'%copy-effect))
 
 (defun context-value (context node &optional (port "value"))
   (%read-value context (%node-designator-name node) (%normalize-name port)))
