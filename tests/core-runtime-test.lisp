@@ -200,7 +200,10 @@
     state-machine-terminal-states
     state-machine-deterministic-p
     state-machine->dot
-    state-machine->mermaid)
+    state-machine->mermaid
+    state-machine-run-states
+    state-machine-accepts-p
+    state-machine-event-path)
   (:pipeline
     pipeline
     pipeline-p
