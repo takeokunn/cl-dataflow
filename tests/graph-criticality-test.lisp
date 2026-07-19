@@ -68,3 +68,27 @@
   ;; A lone source dominates nothing, so the map is empty.
   (with-graph-fixture (graph ((r "r")))
     (is (null (graph-dominators graph "r")))))
+
+(deftest graph-post-dominators-builds-the-reverse-dominator-tree
+  ;; In the chain a -> b -> c toward sink c, every path from a to c runs through
+  ;; b, and every path from b through c: ipdom(a)=b, ipdom(b)=c.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b c)))
+    (is (equal (graph-post-dominators graph "c")
+               '(("a" . "b") ("b" . "c")))))
+  ;; A diamond that reconverges at the sink d: both branches must pass through d,
+  ;; and a's paths reconverge only at d, so every node's post-dominator is d.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    (is (equal (graph-post-dominators graph "d")
+               '(("a" . "d") ("b" . "d") ("c" . "d")))))
+  ;; A node that cannot reach the sink has no post-dominator and is omitted.
+  (with-graph-fixture (graph
+                       ((a "a") (sink "sink") (stray "stray"))
+                       :edges ((a sink)))
+    (is (equal (graph-post-dominators graph "sink") '(("a" . "sink")))))
+  ;; A lone sink post-dominates nothing.
+  (with-graph-fixture (graph ((sink "sink")))
+    (is (null (graph-post-dominators graph "sink")))))

@@ -128,6 +128,7 @@
     #:graph-articulation-points
     #:graph-bridges
     #:graph-dominators
+    #:graph-post-dominators
 
     #:context
     #:context-p

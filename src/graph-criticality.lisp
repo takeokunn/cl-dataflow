@@ -110,6 +110,37 @@ immediate-dominator tree IDOM until the two fingers meet, comparing INDEX depths
                  do (setf b (gethash b idom))))
   a)
 
+(defun %immediate-dominators (root forward backward)
+  "The immediate-dominator alist (NODE . IDOM) of the flow graph whose out-edges
+are FORWARD and in-edges are BACKWARD, rooted at ROOT and ordered by node name.
+FORWARD drives the reverse-postorder walk; BACKWARD supplies the predecessors
+whose partial dominators are intersected. GRAPH-DOMINATORS passes successors as
+FORWARD; GRAPH-POST-DOMINATORS passes predecessors, computing dominance on the
+reversed graph. Nodes ROOT cannot reach through FORWARD are omitted."
+  (let ((idom (%make-result-table)))
+    (multiple-value-bind (rpo index) (%dominance-postorder root forward)
+      (setf (gethash root idom) root)
+      (let ((changed t))
+        (loop while changed
+              do (setf changed nil)
+                 (dolist (node rpo)
+                   (unless (equal node root)
+                     (let ((new-idom nil))
+                       (dolist (predecessor (gethash node backward))
+                         (when (nth-value 1 (gethash predecessor idom))
+                           (setf new-idom
+                                 (if new-idom
+                                     (%dominance-intersect predecessor new-idom
+                                                           index idom)
+                                     predecessor))))
+                       (unless (equal (gethash node idom) new-idom)
+                         (setf (gethash node idom) new-idom
+                               changed t)))))))
+      (sort (loop for node being the hash-keys of idom using (hash-value dominator)
+                  unless (equal node root)
+                  collect (cons node dominator))
+            #'string< :key #'car))))
+
 (defun graph-dominators (graph source)
   "Return the immediate-dominator map of GRAPH rooted at SOURCE as an alist
 (NODE . IDOM), ordered by node name: for every node reachable from SOURCE other
@@ -119,28 +150,19 @@ Cooper-Harvey-Kennedy dominance algorithm over reverse postorder, so it stays
 polynomial and stack-safe on deep, cyclic graphs. Signals when SOURCE is absent."
   (let ((source-name (%node-designator-name source)))
     (%ensure-graph-node graph source-name)
-    (let ((successors (%graph-adjacency-snapshot graph :successors))
-          (predecessors (%graph-adjacency-snapshot graph :predecessors))
-          (idom (%make-result-table)))
-      (multiple-value-bind (rpo index) (%dominance-postorder source-name successors)
-        (setf (gethash source-name idom) source-name)
-        (let ((changed t))
-          (loop while changed
-                do (setf changed nil)
-                   (dolist (node rpo)
-                     (unless (equal node source-name)
-                       (let ((new-idom nil))
-                         (dolist (predecessor (gethash node predecessors))
-                           (when (nth-value 1 (gethash predecessor idom))
-                             (setf new-idom
-                                   (if new-idom
-                                       (%dominance-intersect predecessor new-idom
-                                                             index idom)
-                                       predecessor))))
-                         (unless (equal (gethash node idom) new-idom)
-                           (setf (gethash node idom) new-idom
-                                 changed t)))))))
-        (sort (loop for node being the hash-keys of idom using (hash-value dominator)
-                    unless (equal node source-name)
-                    collect (cons node dominator))
-              #'string< :key #'car)))))
+    (%immediate-dominators source-name
+                           (%graph-adjacency-snapshot graph :successors)
+                           (%graph-adjacency-snapshot graph :predecessors))))
+
+(defun graph-post-dominators (graph sink)
+  "Return the immediate-post-dominator map of GRAPH toward SINK as an alist
+(NODE . IPDOM), ordered by node name: for every node that can reach SINK other
+than SINK itself, the closest node through which every path from that node to
+SINK must pass. It is exactly GRAPH-DOMINATORS on the reversed graph rooted at
+SINK, so it shares the same iterative, stack-safe machinery; nodes that cannot
+reach SINK are omitted. Signals when SINK is absent."
+  (let ((sink-name (%node-designator-name sink)))
+    (%ensure-graph-node graph sink-name)
+    (%immediate-dominators sink-name
+                           (%graph-adjacency-snapshot graph :predecessors)
+                           (%graph-adjacency-snapshot graph :successors))))
