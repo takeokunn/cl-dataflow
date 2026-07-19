@@ -59,6 +59,27 @@ Edge direction is ignored; a self-loop makes the graph non-bipartite."
                            (return-from done nil)))))))
                 (setf frontier next)))))))))
 
+(defun graph-greedy-coloring (graph)
+  "Return an alist (NAME . COLOR) assigning each node a non-negative integer color so
+that adjacent nodes (edge direction ignored) never share a color, using greedy
+first-fit over nodes in name order. Graph colouring is NP-hard, so the result is a
+valid but not necessarily minimum colouring; it generalises GRAPH-BIPARTITE-P (which
+tests for a valid 2-colouring). Ordered by name."
+  (let ((adjacency (%undirected-adjacency graph))
+        (color (make-hash-table :test #'equal)))
+    (dolist (name (%graph-node-name-set graph))
+      (let ((used (make-hash-table :test #'eql)))
+        (dolist (neighbor (gethash name adjacency))
+          (let ((neighbor-color (gethash neighbor color)))
+            (when neighbor-color
+              (setf (gethash neighbor-color used) t))))
+        (let ((candidate 0))
+          (loop while (gethash candidate used) do (incf candidate))
+          (setf (gethash name color) candidate))))
+    (sort (loop for name being the hash-keys of color using (hash-value assigned)
+                collect (cons name assigned))
+          #'string< :key #'car)))
+
 (defun graph-equal-p (graph-a graph-b)
   "Return true when GRAPH-A and GRAPH-B are structurally identical: the same nodes
 (names, ports, metadata) and the same edges (endpoints, ports, metadata),

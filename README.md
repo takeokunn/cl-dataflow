@@ -146,7 +146,7 @@ nix flake check
 - Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`, `graph-contract-edge`
 - Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`, `graph-weighted-path`
 - Equality/reachability predicate APIs: `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p`, `state-machine-reachable-p`
-- Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-equal-p`, `graph-undirected-reachable-p`
+- Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-greedy-coloring`, `graph-equal-p`, `graph-undirected-reachable-p`
 - Graph connectivity APIs: `graph-connected-p`, `graph-strongly-connected-p`, `graph-self-loop-nodes`, `graph-condensation`, `graph-distances-from`, `graph-bfs-order`, `graph-dfs-order`, `graph-eccentricity`, `graph-diameter`
 - Graph algebra APIs: `graph-union`, `graph-intersection`, `graph-difference`, `graph-diff`, `graph-filter-nodes`, `graph-map-nodes`
 - Graph criticality APIs: `graph-articulation-points`, `graph-bridges`

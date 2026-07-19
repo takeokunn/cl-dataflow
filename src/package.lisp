@@ -102,6 +102,7 @@
     #:graph-density
     #:graph-degree-histogram
     #:graph-bipartite-p
+    #:graph-greedy-coloring
     #:graph-equal-p
     #:graph-undirected-reachable-p
     #:graph-connected-p

@@ -56,3 +56,14 @@
     ;; c is isolated.
     (is (not (graph-undirected-reachable-p graph "a" "c")))
     (signals node-not-found-error (graph-undirected-reachable-p graph "a" "missing"))))
+
+(deftest graph-greedy-coloring-produces-a-valid-colouring
+  ;; A path 2-colours: a=0, b=1, c=0.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c)))
+    (is (equal (graph-greedy-coloring graph) '(("a" . 0) ("b" . 1) ("c" . 0)))))
+  ;; A triangle needs three colours.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c) (c a)))
+    (is (equal (graph-greedy-coloring graph) '(("a" . 0) ("b" . 1) ("c" . 2)))))
+  ;; An isolated node takes colour 0.
+  (with-graph-fixture (graph ((solo "solo")))
+    (is (equal (graph-greedy-coloring graph) '(("solo" . 0))))))
