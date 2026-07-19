@@ -24,9 +24,14 @@
 | Effects | Done | Effect creation, handler lookup, and test-friendly execution are implemented. |
 | State machines | Done | States, transitions, guards, history, reset/copy helpers, step-based execution, context propagation, and pipeline-stage embedding are implemented. |
 | Event workflows | Done | Pipeline stages can emit events, run effects, and advance a state machine in one workflow. |
+| Graph algorithms | Done | Strongly/weakly connected components, topological generations, transpose, acyclicity, shortest-hop distance, degrees, and immediate neighbors, all over the bulk-query adjacency snapshot. |
+| Graph export | Done | Deterministic Graphviz DOT and Mermaid rendering, plus a `graph-to-plist`/`plist-to-graph` structural round trip. |
+| State-machine analysis | Done | State/event enumeration, reachability, unreachable/terminal-state detection, structural determinism check, and DOT/Mermaid rendering. |
+| Combinators | Done | Handler wrappers (retry, fallback, memoize, tap, map, compose), node wrappers, and result-threading pipeline sequencing. |
+| Streams | Done | A lazy transducer layer (`map`/`filter`/`scan`/`take`/`drop`/`distinct`/`flat-map`/`concat`/`zip`/`tap`) with `collect`/`reduce`/`for-each`/`count`/`first` consumers. |
 | Protocols | Done | `flow-name`, `flow-metadata`, and `flow-kind` provide consistent introspection across flow objects. |
 | Testing helpers | Done | Dedicated helpers assert emitted events, effects, final state, state-machine state, and pipeline results. |
-| Runnable examples | Done | Minimal scripts cover a simple pipeline, an event workflow, and a state machine. |
+| Runnable examples | Done | Scripts cover a simple pipeline, event workflow, state machine, graph analysis, the graph toolkit, state-machine visualization, resilient pipelines, and streams. |
 | Public API | Stable | `cl-dataflow` is the single exported package. |
 
 ## Install
@@ -106,7 +111,12 @@ nix flake check
 - Event APIs: `make-event`, `copy-event`, `emit-event`, `event-type`, `event-payload`, `event-metadata`, `event-trace-index`
 - Effect APIs: `make-effect`, `copy-effect`, `perform-effect`, `effect-type`, `effect-payload`, `effect-metadata`, `effect-trace-index`, `effect-result`
 - State machine APIs: `make-transition`, `define-state-machine`, `step-state-machine`, `run-state-machine`, `run-state-machine-with-context`, `make-state-machine-node`, `make-state-machine`, `copy-state-machine`, `state-machine-last-transition`, `state-machine-available-transitions`, `state-machine-can-step-p`, `reset-state-machine`, `transition-from`, `transition-event-type`, `transition-to`, `transition-guard`, `transition-action`, `transition-metadata`, `state-machine-state`, `state-machine-initial-state`, `state-machine-transitions`, `state-machine-history`, `state-machine-metadata`
-- Pipeline APIs: `make-pipeline`, `define-pipeline`, `define-workflow`, `copy-pipeline`, `run-pipeline`, `run-pipeline-with-context`, `pipeline-graph`, `pipeline-stages`, `pipeline-metadata`
+- Pipeline APIs: `make-pipeline`, `define-pipeline`, `define-workflow`, `copy-pipeline`, `run-pipeline`, `run-pipeline-with-context`, `run-pipeline-sequence`, `pipeline-graph`, `pipeline-stages`, `pipeline-metadata`
+- Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
+- Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-to-plist`, `plist-to-graph`
+- State-machine analysis APIs: `state-machine-states`, `state-machine-event-types`, `state-machine-reachable-states`, `state-machine-unreachable-states`, `state-machine-terminal-states`, `state-machine-deterministic-p`, `state-machine->dot`, `state-machine->mermaid`
+- Combinator APIs: `mapping-handler`, `compose-handlers`, `retrying-handler`, `fallback-handler`, `memoizing-handler`, `tapping-handler`, `wrap-node`, `node-with-retry`, `node-with-fallback`, `node-with-memoization`, `node-with-tap`
+- Stream APIs: `flow-stream-p`, `empty-stream`, `list->stream`, `stream-of`, `stream-range`, `stream-map`, `stream-filter`, `stream-scan`, `stream-take`, `stream-drop`, `stream-take-while`, `stream-drop-while`, `stream-distinct`, `stream-flat-map`, `stream-concat`, `stream-zip`, `stream-tap`, `stream-collect`, `stream-reduce`, `stream-for-each`, `stream-count`, `stream-first`, `stream-empty-p`
 - Protocols: `flow-name`, `flow-metadata`, `flow-kind` across nodes, edges, graphs, contexts, events, effects, transitions, state machines, and pipelines
 - Testing helpers: `run-pipeline-with-test-context`, `assert-emitted-events`, `assert-performed-effects`, `assert-final-state`, `assert-state-machine-state`, `assert-pipeline-result`
 
@@ -190,6 +200,10 @@ Runnable examples are provided as plain scripts:
 - `examples/event-workflow.lisp` - a pipeline that emits events and advances a state machine
 - `examples/state-machine.lisp` - a standalone state machine transition flow
 - `examples/graph-analysis.lisp` - reachability analysis (descendants, ancestors, shortest path, boundaries) over a dataflow graph
+- `examples/graph-toolkit.lisp` - strongly connected components, topological generations, transpose, distance, and DOT/Mermaid rendering
+- `examples/state-machine-visualization.lisp` - state/event enumeration, reachability, terminal and unreachable states, and DOT/Mermaid rendering
+- `examples/resilient-pipeline.lisp` - retrying and fallback node wrappers plus result-threading pipeline sequencing
+- `examples/streams.lisp` - lazy stream pipelines (map/filter/take/scan/flat-map/distinct) over an unbounded range
 
 Run them with SBCL:
 
@@ -198,6 +212,10 @@ sbcl --script examples/simple-pipeline.lisp
 sbcl --script examples/event-workflow.lisp
 sbcl --script examples/state-machine.lisp
 sbcl --script examples/graph-analysis.lisp
+sbcl --script examples/graph-toolkit.lisp
+sbcl --script examples/state-machine-visualization.lisp
+sbcl --script examples/resilient-pipeline.lisp
+sbcl --script examples/streams.lisp
 ```
 
 Expected outputs:
@@ -206,6 +224,10 @@ Expected outputs:
 - `examples/event-workflow.lisp` prints the final workflow state and event trace
 - `examples/state-machine.lisp` prints `Final state: completed`, the transition count, and the last transition record
 - `examples/graph-analysis.lisp` prints the downstream/upstream node sets, the shortest `ingest -> load` path, and the graph's source and sink nodes
+- `examples/graph-toolkit.lisp` prints the graph order/size, topological generations, `a -> d` distance, strongly connected components, and DOT/Mermaid diagrams
+- `examples/state-machine-visualization.lisp` prints the state and event sets, reachable/unreachable/terminal states, the determinism verdict, and DOT/Mermaid diagrams
+- `examples/resilient-pipeline.lisp` prints `Retry result: 70 (after 3 attempts)`, the fallback results, and the sequenced pipeline result
+- `examples/streams.lisp` prints `First 3 even squares: (4 16 36)`, the running totals, the flat-mapped list, and the distinct sum
 
 ## Testing
 

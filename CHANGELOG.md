@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- No changes yet.
+### Added
+
+- Graph analysis API (`graph-algorithms.lisp`): `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components` (iterative Kosaraju), `graph-connected-components` (weakly connected), `graph-topological-generations` (parallelizable layers), and `graph-distance` (shortest hop count). Each builds the adjacency snapshot once and walks it with an explicit work list, so all stay linear and terminate on deep and cyclic graphs, matching the existing reachability API's guarantees.
+- Graph export API (`graph-export.lisp`): deterministic `graph->dot` (Graphviz) and `graph->mermaid` renderers, plus a `graph-to-plist`/`plist-to-graph` structural round trip for persisting, diffing, and transmitting graph shape (node handlers, being runtime closures, are intentionally not serialized).
+- State-machine analysis API (`state-machine-analysis.lisp`): `state-machine-states`, `state-machine-event-types`, `state-machine-reachable-states`, `state-machine-unreachable-states`, `state-machine-terminal-states`, `state-machine-deterministic-p` (structural determinism, guard-independent), and deterministic `state-machine->dot`/`state-machine->mermaid` rendering.
+- Combinator API (`combinators.lisp`): handler adapters/wrappers (`mapping-handler`, `compose-handlers`, `retrying-handler`, `fallback-handler`, `memoizing-handler`, `tapping-handler`), node wrappers (`wrap-node`, `node-with-retry`, `node-with-fallback`, `node-with-memoization`, `node-with-tap`) that re-wrap an existing node's handler, and `run-pipeline-sequence` for threading one pipeline's result into the next through a shared, observable context.
+- Stream/transducer API (`streams.lisp`): a lazy pull-based `flow-stream` with operators `stream-map`, `stream-filter`, `stream-scan`, `stream-take`, `stream-drop`, `stream-take-while`, `stream-drop-while`, `stream-distinct`, `stream-flat-map`, `stream-concat`, `stream-zip`, `stream-tap`; constructors `stream-of`, `list->stream`, `empty-stream`, `stream-range`; and consumers `stream-collect`, `stream-reduce`, `stream-for-each`, `stream-count`, `stream-first`, `stream-empty-p`. Operators are pure (streams re-consume identically) and their per-pull skip loops are iterative, so filtering long runs never grows the control stack.
+- New runnable examples: `examples/graph-toolkit.lisp`, `examples/state-machine-visualization.lisp`, `examples/resilient-pipeline.lisp`, and `examples/streams.lisp`, each registered in the example smoke-test suite.
+- 97 new tests covering the five modules (graph algorithms, export/serialization round trips, state-machine analysis, combinator behavior including retry/fallback/memoization, and stream laziness/purity/composition), bringing the suite from 189 to 286.
 
 ## [0.1.0] - 2026-07-20
 

@@ -121,4 +121,25 @@ assertions. Prefers a system SBCL, then falls back to `nix run nixpkgs#sbcl`."
    "examples/graph-analysis.lisp"
    "Downstream of parse"
    "Shortest path ingest -> load"
-   "Sources: (\"ingest\")"))
+   "Sources: (\"ingest\")")
+  (example-graph-toolkit-script-runs
+   "examples/graph-toolkit.lisp"
+   "Order: 4  Size: 4"
+   "Distance a -> d: 2"
+   "Strongly connected components: ((\"x\" \"y\" \"z\"))"
+   "digraph deps {")
+  (example-state-machine-visualization-script-runs
+   "examples/state-machine-visualization.lisp"
+   "Unreachable states: (\"archived\")"
+   "Terminal states: (\"cancelled\" \"shipped\")"
+   "stateDiagram-v2")
+  (example-resilient-pipeline-script-runs
+   "examples/resilient-pipeline.lisp"
+   "Retry result: 70 (after 3 attempts)"
+   "Fallback on odd 3: -1"
+   "Sequenced (double then increment) of 20: 41")
+  (example-streams-script-runs
+   "examples/streams.lisp"
+   "First 3 even squares: (4 16 36)"
+   "Running totals: (0 1 3 6 10)"
+   "Sum of distinct values: 10"))

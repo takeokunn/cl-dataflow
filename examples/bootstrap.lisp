@@ -15,6 +15,11 @@
     "src/effects.lisp"
     "src/state-machine.lisp"
     "src/pipeline.lisp"
+    "src/graph-algorithms.lisp"
+    "src/graph-export.lisp"
+    "src/state-machine-analysis.lisp"
+    "src/combinators.lisp"
+    "src/streams.lisp"
     "src/testing.lisp"))
 
 (defun use-interpreted-loading-when-available ()
