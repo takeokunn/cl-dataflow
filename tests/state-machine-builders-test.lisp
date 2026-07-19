@@ -60,3 +60,28 @@
       (is (equal (state-machine-states relabeled) '("ready" "running")))
       ;; The original is unchanged.
       (is (equal (state-machine-state machine) "idle")))))
+
+(deftest state-machine->graph-enables-graph-analysis
+  ;; A cyclic lifecycle a -> b -> c -> a.
+  (with-state-machine-fixture (machine
+                               :state "a"
+                               :transitions ((ab "a" "go" "b")
+                                             (bc "b" "go" "c")
+                                             (ca "c" "reset" "a")))
+    (let ((graph (state-machine->graph machine)))
+      (is (equal (graph-node-names graph) '("a" "b" "c")))
+      (is (= (graph-size graph) 3))
+      ;; The whole graph toolkit now applies to the state machine.
+      (is (graph-strongly-connected-p graph))
+      (is (graph-find-cycle graph))
+      ;; Each edge records its transition's event type in metadata.
+      (let ((ab (find-if (lambda (edge)
+                           (and (equal (edge-from edge) "a")
+                                (equal (edge-to edge) "b")))
+                         (graph-edges graph))))
+        (is (equal (getf (edge-metadata ab) :event) "go")))))
+  ;; Parallel transitions between the same states collapse to one edge.
+  (with-state-machine-fixture (machine
+                               :state "a"
+                               :transitions ((go "a" "go" "b") (jump "a" "jump" "b")))
+    (is (= (graph-size (state-machine->graph machine)) 1))))

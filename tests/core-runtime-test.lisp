@@ -261,6 +261,7 @@
     add-transition
     remove-transition
     state-machine-relabel-state
+    state-machine->graph
     state-machine-equal-p
     state-machine-reachable-p)
   (:pipeline

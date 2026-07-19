@@ -90,6 +90,28 @@ return MACHINE."
                      (slot-value machine 'transitions)))
     machine))
 
+(defun state-machine->graph (machine)
+  "Return a graph modelling MACHINE's state structure: one node per state and one
+edge per distinct (FROM, TO) transition pair (the first such transition's event type
+is stored in the edge's metadata under :event). This bridges a state machine to the
+graph-analysis toolkit -- cycles, strongly connected components, distances,
+condensation, and so on all apply. Parallel transitions between the same pair of
+states collapse to a single edge; a self-transition becomes a self-loop."
+  (let ((graph (make-graph))
+        (seen (make-hash-table :test #'equal)))
+    (dolist (state (state-machine-states machine))
+      (add-node graph (make-node state)))
+    (dolist (transition (%state-machine-transitions-list machine))
+      (let ((key (cons (transition-from transition) (transition-to transition))))
+        (unless (gethash key seen)
+          (setf (gethash key seen) t)
+          (let ((edge (add-edge graph
+                                (transition-from transition)
+                                (transition-to transition))))
+            (setf (edge-metadata edge)
+                  (list :event (transition-event-type transition)))))))
+    graph))
+
 (defun state-machine-relabel-state (machine old-state new-state)
   "Return a new state machine identical to MACHINE but with state OLD-STATE renamed
 to NEW-STATE everywhere (current state, initial state, and every transition
