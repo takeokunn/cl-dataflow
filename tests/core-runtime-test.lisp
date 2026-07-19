@@ -286,7 +286,10 @@
     pipeline-stage-count
     map-pipeline
     pipeline->node
-    pipeline-equal-p)
+    pipeline-equal-p
+    run-pipeline-times
+    run-pipeline-until-fixpoint
+    run-pipeline-while)
   (:combinators
     mapping-handler
     compose-handlers

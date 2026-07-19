@@ -256,6 +256,9 @@
     #:map-pipeline
     #:pipeline->node
     #:pipeline-equal-p
+    #:run-pipeline-times
+    #:run-pipeline-until-fixpoint
+    #:run-pipeline-while
 
     #:mapping-handler
     #:compose-handlers

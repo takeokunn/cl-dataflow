@@ -20,6 +20,7 @@
 | --- | --- | --- |
 | Graphs and nodes | Done | Node creation, edge construction, graph validation, and topological sort are implemented. |
 | Pipelines | Done | Sequential pipelines and simple branching pipelines run against graph-ordered stages. |
+| Iterative pipelines | Done | Feedback execution: `run-pipeline-times`, `run-pipeline-until-fixpoint`, and `run-pipeline-while` feed a result back as the next input for recurrent/settling computations. |
 | Events | Done | Event creation, emission, and trace capture are implemented. |
 | Effects | Done | Effect creation, handler lookup, and test-friendly execution are implemented. |
 | State machines | Done | States, transitions, guards, history, reset/copy helpers, step-based execution, context propagation, and pipeline-stage embedding are implemented. |
@@ -130,6 +131,7 @@ nix flake check
 - Pipeline APIs: `make-pipeline`, `define-pipeline`, `define-workflow`, `copy-pipeline`, `run-pipeline`, `run-pipeline-with-context`, `run-pipeline-sequence`, `pipeline-graph`, `pipeline-stages`, `pipeline-metadata`
 - Observability APIs: `pipeline->dot`, `pipeline->mermaid`, `pipeline-node-names`, `pipeline-stage-names`, `pipeline-source-names`, `pipeline-sink-names`, `format-trace`, `trace-summary`, `context-summary`
 - Pipeline extension APIs: `pipeline-to-plist`, `plist-to-pipeline`, `pipeline-validate`, `pipeline-stage-count`, `map-pipeline`, `pipeline->node`
+- Iterative pipeline APIs: `run-pipeline-times`, `run-pipeline-until-fixpoint`, `run-pipeline-while`
 - Batch event/effect APIs: `emit-events`, `perform-effects`, `event-of-type-p`, `effect-of-type-p`, `context-effect-results`, `context-effect-results-of-type`
 - Context & introspection APIs: `context-merge`, `context-trace-of-kind`, `flow-describe`, `flow-children`
 - Serialization APIs: `context-to-plist`, `plist-to-context`, `event-to-plist`, `plist-to-event`, `effect-to-plist`, `plist-to-effect`
