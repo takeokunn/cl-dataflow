@@ -170,7 +170,9 @@
     format-trace
     trace-summary
     context-merge
-    context-trace-of-kind)
+    context-trace-of-kind
+    context-to-plist
+    plist-to-context)
   (:event
     event
     event-p
@@ -182,7 +184,9 @@
     emit-event
     copy-event
     emit-events
-    event-of-type-p)
+    event-of-type-p
+    event-to-plist
+    plist-to-event)
   (:effect
     effect
     effect-p
@@ -202,7 +206,9 @@
     perform-effects
     context-effect-results
     context-effect-results-of-type
-    effect-of-type-p)
+    effect-of-type-p
+    effect-to-plist
+    plist-to-effect)
   (:state-machine
     state-transition
     state-transition-p
@@ -350,7 +356,11 @@
     stream-count-if
     stream-variance
     stream-stddev
-    stream-median)
+    stream-median
+    stream-find-index
+    stream-none-p
+    stream-mode
+    stream-cartesian)
   (:testing
     run-pipeline-with-test-context
     assert-emitted-events

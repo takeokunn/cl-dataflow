@@ -39,6 +39,8 @@
 | Stream extras | Done | Generators (`iterate`/`repeat`/`cycle`/`enumerate`/`unfold`), windowing (`chunk`/`window`/`partition-by`), and aggregate consumers (`sum`/`min`/`max`/`find`/`some`/`every`/`last`/`nth`). |
 | Stream ops | Done | `zip-with`, `interleave`, `take-nth`, `dedupe-consecutive`, `interpose`, plus collectors `group-by`, `frequencies`, `index-by`, `partition`, `split-at`, `average`. |
 | Stream statistics | Done | `flatten`, `scan1`, `count-if`, and statistical aggregates `variance`, `stddev`, `median`. |
+| Stream search | Done | `find-index`, `none-p`, `mode`, and the lazy Cartesian product `stream-cartesian`. |
+| Context serialization | Done | `context-to-plist`/`plist-to-context` plus event/effect plist round trips, completing the serialization story (handlers excluded). |
 | Observability | Done | Pipeline rendering (`pipeline->dot`/`->mermaid`) and role enumeration, plus `format-trace`, `trace-summary`, and `context-summary` over a run's recorded trace. |
 | Effect ergonomics | Done | `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, and the `with-effect-handler-scope` macro for scoped handler registration. |
 | Protocols | Done | `flow-name`, `flow-metadata`, and `flow-kind` provide consistent introspection across flow objects. |
@@ -128,6 +130,8 @@ nix flake check
 - Pipeline extension APIs: `pipeline-to-plist`, `plist-to-pipeline`, `pipeline-validate`, `pipeline-stage-count`, `map-pipeline`, `pipeline->node`
 - Batch event/effect APIs: `emit-events`, `perform-effects`, `event-of-type-p`, `effect-of-type-p`, `context-effect-results`, `context-effect-results-of-type`
 - Context & introspection APIs: `context-merge`, `context-trace-of-kind`, `flow-describe`, `flow-children`
+- Serialization APIs: `context-to-plist`, `plist-to-context`, `event-to-plist`, `plist-to-event`, `effect-to-plist`, `plist-to-effect`
+- Stream search APIs: `stream-find-index`, `stream-none-p`, `stream-mode`, `stream-cartesian`
 - Effect ergonomics APIs: `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, `with-effect-handler-scope`
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-to-plist`, `plist-to-graph`

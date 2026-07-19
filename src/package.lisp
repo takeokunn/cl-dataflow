@@ -141,6 +141,8 @@
     #:trace-summary
     #:context-merge
     #:context-trace-of-kind
+    #:context-to-plist
+    #:plist-to-context
 
     #:event
     #:event-p
@@ -152,6 +154,8 @@
     #:emit-event
     #:emit-events
     #:event-of-type-p
+    #:event-to-plist
+    #:plist-to-event
 
     #:effect
     #:effect-p
@@ -171,6 +175,8 @@
     #:context-effect-results
     #:context-effect-results-of-type
     #:effect-of-type-p
+    #:effect-to-plist
+    #:plist-to-effect
 
     #:state-transition
     #:state-transition-p
@@ -320,6 +326,10 @@
     #:stream-variance
     #:stream-stddev
     #:stream-median
+    #:stream-find-index
+    #:stream-none-p
+    #:stream-mode
+    #:stream-cartesian
 
     #:run-pipeline-with-test-context
     #:assert-emitted-events
