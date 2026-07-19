@@ -77,13 +77,22 @@
     (unless (member (edge-to-port edge) (%node-inputs-list to-node) :test #'equal)
       (%signal-unknown-edge-port graph edge "input" (edge-to-port edge)))))
 
-(defun validate-graph (graph)
+(defun %validate-graph-structure (graph)
+  "Validate structural integrity only: node port lists are well formed and every
+edge references existing nodes and ports. This is O(V+E) and issues no Prolog
+queries, so it is safe to run on the read path. It deliberately does NOT check
+acyclicity, so a legally constructed cyclic graph stays inspectable."
   (maphash (lambda (name node)
               (declare (ignore name))
               (%validate-node-port-lists graph node))
             (%graph-nodes-table graph))
   (dolist (edge (%graph-edges-list graph))
     (%validate-node-ports graph edge))
+  t)
+
+(defun validate-graph (graph)
+  "Full validation: structural integrity plus acyclicity via topological-sort."
+  (%validate-graph-structure graph)
   (topological-sort graph)
   t)
 
