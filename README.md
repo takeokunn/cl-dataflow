@@ -38,7 +38,8 @@
 | State-machine execution | Done | `state-machine-run-states` (visited-state trace), `state-machine-accepts-p` (acceptance), and `state-machine-event-path` (shortest driving event sequence between two states). |
 | State-machine builders | Done | Serialization (`to-plist`/`plist-to`), `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`/`remove-transition`, and `state-machine-relabel-state`. |
 | Combinators | Done | Handler wrappers (retry, fallback, memoize, tap, map, compose), node wrappers, and result-threading pipeline sequencing. |
-| Streams | Done | A lazy transducer layer (`map`/`filter`/`scan`/`take`/`drop`/`distinct`/`flat-map`/`concat`/`zip`/`tap`) with `collect`/`reduce`/`for-each`/`count`/`first` consumers. |
+| Streams (pull) | Done | A lazy transducer layer (`map`/`filter`/`scan`/`take`/`drop`/`distinct`/`flat-map`/`concat`/`zip`/`tap`) with `collect`/`reduce`/`for-each`/`count`/`first` consumers. |
+| Reactive subjects (push) | Done | Synchronous push-based subjects with `subscribe`/`emit`/`unsubscribe` and derived `subject-map`/`subject-filter`/`subject-merge` -- the producer-driven dual of pull streams for event-driven workflows. |
 | Stream extras | Done | Generators (`iterate`/`repeat`/`cycle`/`enumerate`/`unfold`), windowing (`chunk`/`window`/`partition-by`), and aggregate consumers (`sum`/`min`/`max`/`find`/`some`/`every`/`last`/`nth`). |
 | Stream ops | Done | `zip-with`, `interleave`, `take-nth`, `dedupe-consecutive`, `interpose`, plus collectors `group-by`, `frequencies`, `index-by`, `partition`, `split-at`, `average`. |
 | Stream statistics | Done | `flatten`, `scan1`, `count-if`, and statistical aggregates `variance`, `stddev`, `median`. |
@@ -136,6 +137,7 @@ nix flake check
 - Context & introspection APIs: `context-merge`, `context-trace-of-kind`, `flow-describe`, `flow-children`
 - Serialization APIs: `context-to-plist`, `plist-to-context`, `event-to-plist`, `plist-to-event`, `effect-to-plist`, `plist-to-effect`
 - Stream search APIs: `stream-find-index`, `stream-none-p`, `stream-mode`, `stream-cartesian`
+- Reactive subject APIs: `make-subject`, `subject-p`, `subject-subscribe`, `subject-unsubscribe`, `subject-emit`, `subject-subscriber-count`, `subject-map`, `subject-filter`, `subject-merge`, `subject-collect`
 - Effect ergonomics APIs: `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, `with-effect-handler-scope`
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-to-plist`, `plist-to-graph`

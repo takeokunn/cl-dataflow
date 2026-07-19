@@ -310,6 +310,17 @@
     flow-kind
     flow-describe
     flow-children)
+  (:reactive
+    make-subject
+    subject-p
+    subject-subscribe
+    subject-unsubscribe
+    subject-emit
+    subject-subscriber-count
+    subject-map
+    subject-filter
+    subject-merge
+    subject-collect)
   (:streams
     flow-stream-p
     empty-stream
