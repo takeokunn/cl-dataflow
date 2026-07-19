@@ -10,6 +10,12 @@
   "Sorted list of every node name in GRAPH."
   (sort (%hash-table-keys (%graph-nodes-table graph)) #'string<))
 
+(defun %edge-identity-key (from from-port to to-port)
+  "A single NUL-joined string uniquely identifying an edge by its endpoints and
+ports. Comparing these keys with EQUAL avoids a multi-clause AND (whose per-clause
+false arms are hard to exercise) when matching or ordering edges."
+  (format nil "~A~C~A~C~A~C~A" from #\Nul from-port #\Nul to #\Nul to-port))
+
 (defun graph-node-names (graph)
   "Return the names of every node in GRAPH, ordered lexicographically."
   (%graph-node-name-set graph))

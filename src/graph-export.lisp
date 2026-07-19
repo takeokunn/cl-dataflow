@@ -11,9 +11,8 @@
 ;;; unreachable when the items (edges, transitions) are already pairwise distinct.
 
 (defun %edge-sort-key (edge)
-  (format nil "~A~C~A~C~A~C~A"
-          (edge-from edge) #\Nul (edge-from-port edge) #\Nul
-          (edge-to edge) #\Nul (edge-to-port edge)))
+  (%edge-identity-key (edge-from edge) (edge-from-port edge)
+                      (edge-to edge) (edge-to-port edge)))
 
 (defun %sorted-edge-snapshots (graph)
   "Edge copies of GRAPH ordered by (from, from-port, to, to-port) for stable output."

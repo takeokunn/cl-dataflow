@@ -111,7 +111,12 @@
     graph->dot
     graph->mermaid
     graph-to-plist
-    plist-to-graph)
+    plist-to-graph
+    remove-node
+    remove-edge
+    graph-subgraph
+    graph-merge
+    graph-relabel-node)
   (:context
     context
     context-p
@@ -245,7 +250,23 @@
     stream-for-each
     stream-count
     stream-first
-    stream-empty-p)
+    stream-empty-p
+    stream-iterate
+    stream-repeat
+    stream-cycle
+    stream-enumerate
+    stream-unfold
+    stream-chunk
+    stream-window
+    stream-partition-by
+    stream-sum
+    stream-min
+    stream-max
+    stream-find
+    stream-some
+    stream-every
+    stream-last
+    stream-nth)
   (:testing
     run-pipeline-with-test-context
     assert-emitted-events
