@@ -117,6 +117,9 @@
     #:graph-dfs-order
     #:graph-eccentricity
     #:graph-diameter
+    #:graph-radius
+    #:graph-center
+    #:graph-periphery
     #:graph-closeness-centrality
     #:graph-betweenness-centrality
     #:graph-union

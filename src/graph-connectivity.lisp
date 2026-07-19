@@ -193,3 +193,31 @@ edges."
     (if eccentricities
         (reduce #'max eccentricities)
         0)))
+
+(defun graph-radius (graph)
+  "Return the radius of GRAPH: the smallest eccentricity over all nodes. Under the
+directed, reaches-nothing-is-0 eccentricity convention (see GRAPH-ECCENTRICITY),
+any sink node makes the radius 0. 0 for a graph with no nodes."
+  (let ((eccentricities (mapcar (lambda (name) (graph-eccentricity graph name))
+                                (graph-node-names graph))))
+    (if eccentricities
+        (reduce #'min eccentricities)
+        0)))
+
+(defun graph-center (graph)
+  "Return the center of GRAPH: the names of the nodes whose eccentricity equals the
+radius, ordered lexicographically. These are the nodes closest (in worst-case hops)
+to everything they reach. Empty for a graph with no nodes."
+  (let ((radius (graph-radius graph)))
+    (loop for name in (graph-node-names graph)
+          when (= (graph-eccentricity graph name) radius)
+          collect name)))
+
+(defun graph-periphery (graph)
+  "Return the periphery of GRAPH: the names of the nodes whose eccentricity equals
+the diameter, ordered lexicographically -- the most far-reaching nodes, those whose
+shortest paths stretch the whole diameter. Empty for a graph with no nodes."
+  (let ((diameter (graph-diameter graph)))
+    (loop for name in (graph-node-names graph)
+          when (= (graph-eccentricity graph name) diameter)
+          collect name)))

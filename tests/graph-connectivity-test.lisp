@@ -51,6 +51,29 @@
     (is (= (graph-diameter graph) 3)))
   (is (= (graph-diameter (make-graph)) 0)))
 
+(deftest graph-radius-center-and-periphery
+  ;; Path a -> b -> c -> d: eccentricities are 3, 2, 1, 0. The sink d gives the
+  ;; radius of 0 and is the sole center; the source a stretches the full diameter
+  ;; of 3 and is the sole periphery.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (b c) (c d)))
+    (is (= (graph-radius graph) 0))
+    (is (equal (graph-center graph) '("d")))
+    (is (equal (graph-periphery graph) '("a"))))
+  ;; Two sources feeding one sink: both sources sit at eccentricity 1 (the
+  ;; diameter), so the periphery holds both, ordered lexicographically.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a c) (b c)))
+    (is (= (graph-radius graph) 0))
+    (is (equal (graph-center graph) '("c")))
+    (is (equal (graph-periphery graph) '("a" "b"))))
+  ;; An empty graph has radius 0 and no center or periphery.
+  (is (= (graph-radius (make-graph)) 0))
+  (is (null (graph-center (make-graph))))
+  (is (null (graph-periphery (make-graph)))))
+
 (deftest graph-bfs-and-dfs-order-traverse-from-a-source
   (with-graph-fixture (graph
                        ((a "a") (b "b") (c "c") (d "d"))
