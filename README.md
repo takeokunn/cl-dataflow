@@ -27,7 +27,8 @@
 | Graph algorithms | Done | Strongly/weakly connected components, topological generations, transpose, acyclicity, shortest-hop distance, degrees, and immediate neighbors, all over the bulk-query adjacency snapshot. |
 | Graph export | Done | Deterministic Graphviz DOT and Mermaid rendering, plus a `graph-to-plist`/`plist-to-graph` structural round trip. |
 | Graph mutation | Done | `remove-node`, `remove-edge`, induced `graph-subgraph`, disjoint `graph-merge`, and `graph-relabel-node` for editing and composing graphs. |
-| Graph paths | Done | Transitive closure/reduction, topological rank, longest (critical) path, all simple paths, an ordered cycle witness, and weighted (Dijkstra) shortest distance. |
+| Graph paths | Done | Transitive closure/reduction, topological rank, longest (critical) path, all simple paths, an ordered cycle witness, and weighted (Dijkstra) shortest distance and path. |
+| Equality predicates | Done | `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p` (structural equality via plist serialization), and `state-machine-reachable-p`. |
 | Graph metrics | Done | Edge density, degree histogram, bipartiteness, structural `graph-equal-p`, and weak (undirected) reachability. |
 | Graph connectivity | Done | Weak/strong connectivity predicates, self-loop nodes, the SCC condensation DAG, single-source distances, eccentricity, and diameter. |
 | Graph algebra | Done | Set operations `graph-union`, `graph-intersection`, `graph-difference`, plus `graph-filter-nodes` (predicate-induced subgraph) and `graph-map-nodes` (injective relabel). |
@@ -136,7 +137,8 @@ nix flake check
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-to-plist`, `plist-to-graph`
 - Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`
-- Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`
+- Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`, `graph-weighted-path`
+- Equality/reachability predicate APIs: `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p`, `state-machine-reachable-p`
 - Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-equal-p`, `graph-undirected-reachable-p`
 - Graph connectivity APIs: `graph-connected-p`, `graph-strongly-connected-p`, `graph-self-loop-nodes`, `graph-condensation`, `graph-distances-from`, `graph-eccentricity`, `graph-diameter`
 - Graph algebra APIs: `graph-union`, `graph-intersection`, `graph-difference`, `graph-filter-nodes`, `graph-map-nodes`

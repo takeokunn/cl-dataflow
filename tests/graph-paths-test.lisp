@@ -135,6 +135,28 @@
   (let ((graph (%weighted-graph '("a" "b") '(("a" "b" 1) ("b" "a" 1)))))
     (is (= (graph-weighted-distance graph "a" "a") 2))))
 
+(deftest graph-weighted-path-returns-the-cheapest-route
+  (let ((graph (%weighted-graph '("a" "b" "c" "d")
+                                '(("a" "b" 2) ("a" "c" 5) ("b" "c" 1) ("c" "d" 1)))))
+    ;; a -> b -> c -> d (2+1+1=4) beats a -> c -> d (5+1=6).
+    (is (equal (graph-weighted-path graph "a" "d") '("a" "b" "c" "d")))
+    (is (null (graph-weighted-path graph "d" "a"))))
+  ;; FROM = TO returns the cycle.
+  (let ((graph (%weighted-graph '("a" "b") '(("a" "b" 1) ("b" "a" 1)))))
+    (is (equal (graph-weighted-path graph "a" "a") '("a" "b" "a"))))
+  ;; A custom weight key with a default for unlabelled edges.
+  (let ((graph (make-graph)))
+    (dolist (name '("a" "b" "c")) (add-node graph (make-node name)))
+    (add-edge graph "b" "c")
+    (setf (edge-metadata (add-edge graph "a" "b")) '(:cost 3))
+    (is (equal (graph-weighted-path graph "a" "c" :weight-key :cost :default-weight 10)
+               '("a" "b" "c"))))
+  ;; b (cost 1) settles before c (cost 2); c's later relaxation of d is longer and
+  ;; must be rejected, exercising the not-shorter relaxation with previous tracking.
+  (let ((graph (%weighted-graph '("a" "b" "c" "d")
+                                '(("a" "b" 1) ("a" "c" 2) ("b" "d" 1) ("c" "d" 1)))))
+    (is (equal (graph-weighted-path graph "a" "d") '("a" "b" "d")))))
+
 (deftest graph-weighted-distance-honours-custom-weight-key-and-default
   (let ((graph (make-graph)))
     (dolist (name '("a" "b" "c"))

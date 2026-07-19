@@ -45,6 +45,7 @@ helpers, all behind a single public package."
                 (:file "events-ext")
                 (:file "introspection")
                 (:file "context-serialization")
+                (:file "equality-predicates")
                 (:file "testing"))
   :in-order-to ((test-op (test-op "cl-dataflow/test"))))
 
@@ -91,6 +92,7 @@ helpers, all behind a single public package."
                 (:file "pipeline-ext-test")
                 (:file "events-ext-test")
                 (:file "introspection-test")
-                (:file "context-serialization-test"))
+                (:file "context-serialization-test")
+                (:file "equality-predicates-test"))
   :perform (test-op (o c)
     (uiop:symbol-call '#:cl-dataflow.test '#:run-tests)))

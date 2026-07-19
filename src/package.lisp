@@ -96,6 +96,7 @@
     #:graph-all-paths
     #:graph-find-cycle
     #:graph-weighted-distance
+    #:graph-weighted-path
     #:graph-density
     #:graph-degree-histogram
     #:graph-bipartite-p
@@ -143,6 +144,7 @@
     #:context-trace-of-kind
     #:context-to-plist
     #:plist-to-context
+    #:context-equal-p
 
     #:event
     #:event-p
@@ -224,6 +226,8 @@
     #:add-transition
     #:remove-transition
     #:state-machine-relabel-state
+    #:state-machine-equal-p
+    #:state-machine-reachable-p
 
     #:pipeline
     #:pipeline-p
@@ -249,6 +253,7 @@
     #:pipeline-stage-count
     #:map-pipeline
     #:pipeline->node
+    #:pipeline-equal-p
 
     #:mapping-handler
     #:compose-handlers

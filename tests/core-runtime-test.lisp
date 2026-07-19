@@ -125,6 +125,7 @@
     graph-all-paths
     graph-find-cycle
     graph-weighted-distance
+    graph-weighted-path
     graph-density
     graph-degree-histogram
     graph-bipartite-p
@@ -172,7 +173,8 @@
     context-merge
     context-trace-of-kind
     context-to-plist
-    plist-to-context)
+    plist-to-context
+    context-equal-p)
   (:event
     event
     event-p
@@ -254,7 +256,9 @@
     state-machine-transition-for
     add-transition
     remove-transition
-    state-machine-relabel-state)
+    state-machine-relabel-state
+    state-machine-equal-p
+    state-machine-reachable-p)
   (:pipeline
     pipeline
     pipeline-p
@@ -279,7 +283,8 @@
     pipeline-validate
     pipeline-stage-count
     map-pipeline
-    pipeline->node)
+    pipeline->node
+    pipeline-equal-p)
   (:combinators
     mapping-handler
     compose-handlers
