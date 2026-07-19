@@ -305,3 +305,93 @@ GRAPH-WEIGHTED-DISTANCE, and FROM = TO resolves only through a cycle."
                                               (gethash name neighbors) settled))
       (when (nth-value 1 (gethash to-name distance))
         (%reconstruct-weighted-path previous from-name to-name)))))
+
+(defun %capacity-network (graph capacity-key default-capacity)
+  "Return (values RESIDUAL NEIGHBORS).  RESIDUAL maps a (FROM . TO) cons to its
+summed edge capacity; NEIGHBORS maps each node to the list of nodes adjacent to
+it in either direction, so a breadth-first search can also push flow back along
+a saturated forward edge."
+  (let ((residual (%make-result-table))
+        (adjacency (%make-result-table)))
+    (dolist (name (%graph-node-name-set graph))
+      (setf (gethash name adjacency) (%make-result-table)))
+    (dolist (edge (%graph-edges-list graph))
+      (let ((from (edge-from edge))
+            (to (edge-to edge))
+            (capacity (%edge-weight edge capacity-key default-capacity)))
+        (incf (gethash (cons from to) residual 0) capacity)
+        (setf (gethash to (gethash from adjacency)) t)
+        (setf (gethash from (gethash to adjacency)) t)))
+    (let ((neighbors (%make-result-table)))
+      (maphash (lambda (name bucket)
+                 (setf (gethash name neighbors)
+                       (loop for other being the hash-keys of bucket
+                             collect other)))
+               adjacency)
+      (values residual neighbors))))
+
+(defun %augmenting-path (residual neighbors source sink)
+  "Breadth-first search for a shortest augmenting path in the residual graph.
+Return the predecessor map when SINK is reached, otherwise NIL."
+  (let ((parent (%make-result-table))
+        (queue (list source)))
+    (setf (gethash source parent) source)
+    (loop while queue
+          do (let ((node (pop queue)))
+               (dolist (next (gethash node neighbors))
+                 (when (and (not (nth-value 1 (gethash next parent)))
+                            (> (gethash (cons node next) residual 0) 0))
+                   (setf (gethash next parent) node)
+                   (setf queue (append queue (list next)))))))
+    (when (nth-value 1 (gethash sink parent))
+      parent)))
+
+(defun %augment-bottleneck (residual parent source sink)
+  "The minimum residual capacity along the SOURCE->SINK path recorded in PARENT."
+  (let ((bottleneck nil)
+        (node sink))
+    (loop until (equal node source)
+          do (let* ((previous (gethash node parent))
+                    (capacity (gethash (cons previous node) residual 0)))
+               (setf bottleneck (if bottleneck (min bottleneck capacity) capacity))
+               (setf node previous)))
+    bottleneck))
+
+(defun %augment-apply (residual parent source sink amount)
+  "Push AMOUNT of flow along the SOURCE->SINK path in PARENT, decreasing forward
+residuals and increasing the matching reverse residuals."
+  (let ((node sink))
+    (loop until (equal node source)
+          do (let ((previous (gethash node parent)))
+               (decf (gethash (cons previous node) residual 0) amount)
+               (incf (gethash (cons node previous) residual 0) amount)
+               (setf node previous)))))
+
+(defun graph-max-flow (graph source sink &key capacity-key default-capacity)
+  "The maximum flow value from SOURCE to SINK over edge-metadata capacities
+(CAPACITY-KEY defaults to :capacity; a capacity-less edge contributes
+DEFAULT-CAPACITY, itself defaulting to 1), computed by Edmonds-Karp -- the
+breadth-first-augmenting form of Ford-Fulkerson.  Parallel edges' capacities
+add.  Returns 0 when SINK is unreachable from SOURCE or when the two coincide.
+Signals when either node is absent.  Runs in polynomial time and terminates on
+cyclic graphs because every augmentation strictly saturates an edge."
+  (let ((capacity-key (or capacity-key :capacity))
+        (default-capacity (or default-capacity 1))
+        (source-name (%node-designator-name source))
+        (sink-name (%node-designator-name sink)))
+    (%ensure-graph-node graph source-name)
+    (%ensure-graph-node graph sink-name)
+    (if (equal source-name sink-name)
+        0
+        (multiple-value-bind (residual neighbors)
+            (%capacity-network graph capacity-key default-capacity)
+          (let ((total 0))
+            (loop for parent = (%augmenting-path residual neighbors
+                                                 source-name sink-name)
+                  while parent
+                  do (let ((bottleneck (%augment-bottleneck residual parent
+                                                            source-name sink-name)))
+                       (%augment-apply residual parent source-name sink-name
+                                       bottleneck)
+                       (incf total bottleneck)))
+            total)))))

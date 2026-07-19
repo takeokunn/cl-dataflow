@@ -100,6 +100,7 @@
     #:graph-weighted-distance
     #:graph-weighted-path
     #:graph-weighted-distances-from
+    #:graph-max-flow
     #:graph-density
     #:graph-degree-histogram
     #:graph-bipartite-p

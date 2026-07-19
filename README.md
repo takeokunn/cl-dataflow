@@ -144,7 +144,7 @@ nix flake check
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-layout`, `graph-to-plist`, `plist-to-graph`
 - Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`, `graph-contract-edge`
-- Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`, `graph-weighted-path`, `graph-weighted-distances-from`
+- Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`, `graph-weighted-path`, `graph-weighted-distances-from`, `graph-max-flow`
 - Equality/reachability predicate APIs: `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p`, `state-machine-reachable-p`
 - Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-greedy-coloring`, `graph-equal-p`, `graph-undirected-reachable-p`
 - Graph connectivity APIs: `graph-connected-p`, `graph-strongly-connected-p`, `graph-self-loop-nodes`, `graph-condensation`, `graph-distances-from`, `graph-bfs-order`, `graph-dfs-order`, `graph-eccentricity`, `graph-diameter`, `graph-closeness-centrality`, `graph-betweenness-centrality`
