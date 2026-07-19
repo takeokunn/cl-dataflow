@@ -66,6 +66,20 @@
     #:graph-path
     #:validate-graph
     #:topological-sort
+    #:graph-node-names
+    #:graph-order
+    #:graph-size
+    #:graph-empty-p
+    #:graph-successors
+    #:graph-predecessors
+    #:graph-out-degree
+    #:graph-in-degree
+    #:graph-transpose
+    #:graph-acyclic-p
+    #:graph-strongly-connected-components
+    #:graph-connected-components
+    #:graph-topological-generations
+    #:graph-distance
 
     #:context
     #:context-p
