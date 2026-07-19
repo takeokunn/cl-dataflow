@@ -68,3 +68,12 @@
     (is (equal (graph-dfs-order graph "b") '("b")))
     (signals node-not-found-error (graph-bfs-order graph "missing"))
     (signals node-not-found-error (graph-dfs-order graph "missing"))))
+
+(deftest graph-closeness-centrality-measures-reach
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c") (d "d")) :edges ((a b) (b c) (c d)))
+    ;; From a: distances 1,2,3 to b,c,d; 3 nodes / total 6 = 1/2.
+    (is (= (graph-closeness-centrality graph "a") 1/2))
+    ;; b reaches c,d at 1,2; 2 / 3.
+    (is (= (graph-closeness-centrality graph "b") 2/3))
+    ;; A sink reaches nothing.
+    (is (= (graph-closeness-centrality graph "d") 0))))

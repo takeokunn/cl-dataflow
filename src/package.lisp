@@ -114,6 +114,7 @@
     #:graph-dfs-order
     #:graph-eccentricity
     #:graph-diameter
+    #:graph-closeness-centrality
     #:graph-union
     #:graph-intersection
     #:graph-difference

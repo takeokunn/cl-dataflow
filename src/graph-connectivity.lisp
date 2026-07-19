@@ -127,6 +127,16 @@ from it, or 0 when NODE reaches nothing."
         (reduce #'max distances)
         0)))
 
+(defun graph-closeness-centrality (graph node)
+  "Return the closeness centrality of NODE: the number of nodes reachable from it
+divided by the total hop distance to all of them, or 0 when NODE reaches nothing. A
+higher value means NODE reaches the rest of the graph in fewer hops on average."
+  (let* ((distances (mapcar #'cdr (graph-distances-from graph node)))
+         (total (reduce #'+ distances :initial-value 0)))
+    (if (zerop total)
+        0
+        (/ (length distances) total))))
+
 (defun graph-diameter (graph)
   "Return the diameter of GRAPH: the largest eccentricity over all nodes -- the
 longest shortest-path distance between any reachable pair. 0 for a graph with no
