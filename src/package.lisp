@@ -101,6 +101,13 @@
     #:graph-bipartite-p
     #:graph-equal-p
     #:graph-undirected-reachable-p
+    #:graph-connected-p
+    #:graph-strongly-connected-p
+    #:graph-self-loop-nodes
+    #:graph-condensation
+    #:graph-distances-from
+    #:graph-eccentricity
+    #:graph-diameter
 
     #:context
     #:context-p
@@ -300,6 +307,12 @@
     #:stream-partition
     #:stream-split-at
     #:stream-average
+    #:stream-flatten
+    #:stream-scan1
+    #:stream-count-if
+    #:stream-variance
+    #:stream-stddev
+    #:stream-median
 
     #:run-pipeline-with-test-context
     #:assert-emitted-events
