@@ -152,4 +152,9 @@ assertions. Prefers a system SBCL, then falls back to `nix run nixpkgs#sbcl`."
    "examples/stream-analytics.lisp"
    "Frequencies: ((:CLICK . 3) (:VIEW . 3) (:PURCHASE . 1))"
    "Window averages: (2 3 4 5)"
-   "Mean of 1..100: 101/2"))
+   "Mean of 1..100: 101/2")
+  (example-integration-script-runs
+   "examples/integration.lisp"
+   "Priced orders: (30 70 120)"
+   "High-value alerts (> 50): (70 120)"
+   "Context round-trips through a plist: T"))

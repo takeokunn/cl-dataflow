@@ -247,6 +247,7 @@ Runnable examples are provided as plain scripts:
 - `examples/streams.lisp` - lazy stream pipelines (map/filter/take/scan/flat-map/distinct) over an unbounded range
 - `examples/graph-analysis-advanced.lisp` - critical path, topological rank, transitive reduction, weighted distance, density/bipartiteness, and a serialization round trip
 - `examples/stream-analytics.lisp` - frequencies, group-by, partition, sliding-window averages, and whole-stream mean
+- `examples/integration.lisp` - an end-to-end scenario composing pipelines, graph analysis, pull streams, reactive subjects, a state machine, and context serialization
 
 Run them with SBCL:
 
@@ -261,6 +262,7 @@ sbcl --script examples/resilient-pipeline.lisp
 sbcl --script examples/streams.lisp
 sbcl --script examples/graph-analysis-advanced.lisp
 sbcl --script examples/stream-analytics.lisp
+sbcl --script examples/integration.lisp
 ```
 
 Expected outputs:
@@ -275,6 +277,7 @@ Expected outputs:
 - `examples/streams.lisp` prints `First 3 even squares: (4 16 36)`, the running totals, the flat-mapped list, and the distinct sum
 - `examples/graph-analysis-advanced.lisp` prints the critical path, topological rank, transitive-reduction edge count, weighted distance, density/bipartiteness, and the serialization round-trip check
 - `examples/stream-analytics.lisp` prints the event frequencies, parity grouping, partition, sliding-window averages, and the mean of 1..100
+- `examples/integration.lisp` prints the priced orders, high-value reactive alerts, the state-machine driving events, and a confirmed context serialization round trip
 
 ## Testing
 
