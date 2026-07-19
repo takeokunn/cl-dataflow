@@ -237,6 +237,29 @@ resolves only through a cycle, matching GRAPH-DISTANCE."
                                 (gethash name neighbors) settled))
       (gethash to-name distance))))
 
+(defun graph-weighted-distances-from (graph from &key weight-key default-weight)
+  "Return an alist (NAME . COST) of the minimum total edge weight from FROM to every
+node reachable from it (weights from edge metadata exactly as in
+GRAPH-WEIGHTED-DISTANCE). FROM appears only if a cycle returns to it. This is
+Dijkstra to all targets -- the weighted, all-destinations companion to
+GRAPH-DISTANCES-FROM. Ordered by name."
+  (let ((weight-key (or weight-key :weight))
+        (default-weight (or default-weight 1))
+        (from-name (%node-designator-name from)))
+    (%ensure-graph-node graph from-name)
+    (let ((neighbors (%weighted-adjacency graph weight-key default-weight))
+          (distance (make-hash-table :test #'equal))
+          (settled (make-hash-table :test #'equal)))
+      (%dijkstra-relax distance 0 (gethash from-name neighbors) settled)
+      (loop for name = (%dijkstra-pick distance settled)
+            while name
+            do (setf (gethash name settled) t)
+               (%dijkstra-relax distance (gethash name distance)
+                                (gethash name neighbors) settled))
+      (sort (loop for name being the hash-keys of distance using (hash-value cost)
+                  collect (cons name cost))
+            #'string< :key #'car))))
+
 (defun %dijkstra-relax-with-previous (distance previous name name-cost neighbors settled)
   (dolist (edge neighbors)
     (let ((to (car edge))

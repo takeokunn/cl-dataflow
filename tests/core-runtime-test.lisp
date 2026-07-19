@@ -128,6 +128,7 @@
     graph-find-cycle
     graph-weighted-distance
     graph-weighted-path
+    graph-weighted-distances-from
     graph-density
     graph-degree-histogram
     graph-bipartite-p

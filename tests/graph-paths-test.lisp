@@ -167,3 +167,22 @@
     (setf (edge-metadata (add-edge graph "a" "b")) '(:cost 7))
     (is (= (graph-weighted-distance graph "a" "b" :weight-key :cost :default-weight 10) 7))
     (is (= (graph-weighted-distance graph "a" "c" :weight-key :cost :default-weight 10) 17))))
+
+(deftest graph-weighted-distances-from-runs-dijkstra-to-all
+  ;; From a: b costs 2 directly; c is cheaper via b (2+3=5) than the direct a->c
+  ;; edge of 10, so Dijkstra must relax it down. Ordered by name; a itself is
+  ;; absent because no path returns to it. Uses the default :weight key.
+  (let ((graph (%weighted-graph '("a" "b" "c")
+                                '(("a" "b" 2) ("b" "c" 3) ("a" "c" 10)))))
+    (is (equal (graph-weighted-distances-from graph "a") '(("b" . 2) ("c" . 5))))
+    ;; A sink reaches nothing, so the alist is empty.
+    (is (null (graph-weighted-distances-from graph "c"))))
+  ;; A custom weight key with an explicit default exercises the supplied-argument
+  ;; branches: a->b carries :cost 7, b->c has none and falls back to 10.
+  (let ((graph (make-graph)))
+    (dolist (name '("a" "b" "c"))
+      (add-node graph (make-node name)))
+    (add-edge graph "b" "c")
+    (setf (edge-metadata (add-edge graph "a" "b")) '(:cost 7))
+    (is (equal (graph-weighted-distances-from graph "a" :weight-key :cost :default-weight 10)
+               '(("b" . 7) ("c" . 17))))))
