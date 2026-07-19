@@ -29,10 +29,15 @@
       bindings))
 
 (defun %edge-binding-table (incoming-edges)
+  "Map each input port to the edge that feeds it. INCOMING-EDGES is newest-first
+(see ADD-EDGE), so when two edges target the same port -- a graph the pipeline
+binding layer cannot represent as two simultaneous producers -- the
+most-recently-added edge wins and earlier ones are ignored, rather than the
+insertion order silently deciding it the other way."
   (let ((bindings (%make-result-table)))
-    (dolist (edge incoming-edges)
-      (setf (gethash (edge-to-port edge) bindings) edge))
-    bindings))
+    (dolist (edge incoming-edges bindings)
+      (unless (gethash (edge-to-port edge) bindings)
+        (setf (gethash (edge-to-port edge) bindings) edge)))))
 
 (defun %incoming-edge-bindings (context node incoming-edges)
   (let ((binding-table (%edge-binding-table incoming-edges)))
@@ -46,8 +51,10 @@
                                      (edge-from-port edge)))
                   bindings)))))))
 
-(defun %collect-node-inputs (context graph node input)
-  (let ((incoming (%incoming-edges graph (node-name node))))
+(defun %collect-node-inputs (context graph node input &optional incoming-index)
+  (let ((incoming (if incoming-index
+                       (gethash (node-name node) incoming-index)
+                       (%incoming-edges graph (node-name node)))))
     (if incoming
         (%collapse-single-binding-list
          (%incoming-edge-bindings context node incoming))

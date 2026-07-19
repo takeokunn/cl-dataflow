@@ -24,6 +24,10 @@
    (events :initform '())
    (effects :initform '())
    (trace :initform '())
+   ;; Mirrors (length trace); kept in sync by %PUSH-CONTEXT-TRACE-ENTRY and the
+   ;; CONTEXT-TRACE setter so TRACE-INDEX allocation doesn't re-walk the whole
+   ;; trace history on every event/effect.
+   (trace-count :initform 0)
    (metadata :initarg :metadata :initform '())
    (effect-handlers :initform (%make-result-table))
    (result :initarg :result :initform nil)

@@ -1,10 +1,28 @@
 # Security Policy
 
-`cl-dataflow` is a small Common Lisp library, but any bug that causes incorrect graph execution, state corruption, or unsafe effect handling should be treated seriously.
+`cl-dataflow` is a small Common Lisp library, but any bug that causes incorrect
+graph execution, state corruption, or unsafe effect handling should be treated
+seriously.
+
+## Supported versions
+
+The library is pre-1.0, so only the latest released version and `main` receive
+security fixes. Upgrade to the newest tag before reporting an issue.
+
+| Version | Supported |
+| --- | --- |
+| 0.1.x   | Yes |
+| < 0.1.0 | No  |
 
 ## Reporting a vulnerability
 
-If you find a security issue, report it privately to the maintainers through the repository owner’s preferred private contact channel.
+Please report vulnerabilities privately using GitHub's private vulnerability
+reporting:
+
+1. Open <https://github.com/takeokunn/cl-dataflow/security/advisories/new>.
+2. Or go to the repository's **Security** tab and choose **Report a vulnerability**.
+
+Do not open a public issue for a suspected vulnerability.
 
 Include:
 
@@ -21,4 +39,7 @@ Include:
 
 ## Expected response
 
-Maintainers should acknowledge reports, validate the impact, and coordinate a fix or mitigation before public disclosure where possible.
+Maintainers aim to acknowledge a report within a few days, validate the impact,
+and coordinate a fix or mitigation before public disclosure where possible. Once
+a fix ships, the advisory is published with credit to the reporter unless
+anonymity is requested.

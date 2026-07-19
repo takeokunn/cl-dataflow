@@ -111,7 +111,22 @@ acyclicity, so a legally constructed cyclic graph stays inspectable."
 (defun find-node (graph name)
   (gethash (%normalize-name name) (%graph-nodes-table graph)))
 
+(defun %signal-duplicate-edge (graph edge)
+  (%signal-graph-error graph
+                        (format nil "Edge already exists: ~A:~A -> ~A:~A"
+                                (edge-from edge)
+                                (edge-from-port edge)
+                                (edge-to edge)
+                                (edge-to-port edge))))
+
 (defun add-edge (graph from to &key from-port to-port)
+  ;; Multiple edges may legitimately target the same (to . to-port): the graph
+  ;; layer is used standalone for reachability/topology (see
+  ;; graph-advanced-property-test.lisp's random DAGs, which route many
+  ;; predecessors into one node's default "value" port), independent of the
+  ;; pipeline binding layer's single-producer-per-port convention. Only exact
+  ;; duplicate edges are rejected here; see %EDGE-BINDING-TABLE for how
+  ;; pipeline execution resolves multiple producers on one input port.
   (let* ((from-node (%ensure-graph-node graph from))
           (to-node (%ensure-graph-node graph to))
           (edge (make-edge from-node to-node
@@ -124,12 +139,7 @@ acyclicity, so a legally constructed cyclic graph stays inspectable."
                           (equal (edge-to existing) (edge-to edge))
                           (equal (edge-to-port existing) (edge-to-port edge))))
                     (%graph-edges-list graph))
-      (%signal-graph-error graph
-                            (format nil "Edge already exists: ~A:~A -> ~A:~A"
-                                    (edge-from edge)
-                                    (edge-from-port edge)
-                                    (edge-to edge)
-                                    (edge-to-port edge))))
+      (%signal-duplicate-edge graph edge))
     (setf (slot-value graph 'edges)
           (cons edge (%graph-edges-list graph)))
     edge))
