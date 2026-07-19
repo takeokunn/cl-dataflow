@@ -112,6 +112,9 @@
     #:context-result
     #:context-state
     #:make-context
+    #:context-summary
+    #:format-trace
+    #:trace-summary
 
     #:event
     #:event-p
@@ -181,6 +184,12 @@
     #:run-pipeline
     #:run-pipeline-with-context
     #:run-pipeline-sequence
+    #:pipeline->dot
+    #:pipeline->mermaid
+    #:pipeline-node-names
+    #:pipeline-stage-names
+    #:pipeline-source-names
+    #:pipeline-sink-names
 
     #:mapping-handler
     #:compose-handlers

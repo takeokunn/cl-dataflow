@@ -140,7 +140,10 @@
     context-result
     context-state
     make-context
-    copy-context)
+    copy-context
+    context-summary
+    format-trace
+    trace-summary)
   (:event
     event
     event-p
@@ -210,7 +213,13 @@
     copy-pipeline
     run-pipeline
     run-pipeline-with-context
-    run-pipeline-sequence)
+    run-pipeline-sequence
+    pipeline->dot
+    pipeline->mermaid
+    pipeline-node-names
+    pipeline-stage-names
+    pipeline-source-names
+    pipeline-sink-names)
   (:combinators
     mapping-handler
     compose-handlers
