@@ -1,0 +1,147 @@
+(in-package #:cl-dataflow.test)
+
+(defun %names (nodes)
+  (mapcar #'node-name nodes))
+
+(defun %weighted-graph (node-names edges)
+  "EDGES: list of (from to weight &optional from-port to-port)."
+  (let ((graph (make-graph)))
+    (dolist (name node-names)
+      (add-node graph (make-node name)))
+    (dolist (spec edges)
+      (destructuring-bind (from to weight &optional (from-port "value") (to-port "value"))
+          spec
+        (let ((edge (add-edge graph from to :from-port from-port :to-port to-port)))
+          (setf (edge-metadata edge) (list :weight weight)))))
+    graph))
+
+(deftest graph-transitive-closure-connects-all-reachable-pairs
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b c)))
+    (let ((closure (graph-transitive-closure graph)))
+      (is (equal (%names (graph-successors closure "a")) '("b" "c")))
+      (is (= (graph-size closure) 3))))
+  ;; A cycle gives every member a self-edge.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b"))
+                       :edges ((a b) (b a)))
+    (let ((closure (graph-transitive-closure graph)))
+      (is (equal (%names (graph-successors closure "a")) '("a" "b")))
+      (is (= (graph-size closure) 4)))))
+
+(deftest graph-transitive-reduction-drops-redundant-edges
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b c) (a c)))
+    (let ((reduced (graph-transitive-reduction graph)))
+      ;; a -> c is implied by a -> b -> c and is removed.
+      (is (= (graph-size reduced) 2))
+      (is (equal (%names (graph-successors reduced "a")) '("b")))
+      ;; Reachability is preserved.
+      (is (graph-reachable-p reduced "a" "c"))))
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b) (b a)))
+    (signals graph-cycle-error (graph-transitive-reduction graph))))
+
+(deftest graph-topological-rank-measures-longest-source-distance
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    (is (equal (graph-topological-rank graph)
+               '(("a" . 0) ("b" . 1) ("c" . 1) ("d" . 2)))))
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b) (b a)))
+    (signals graph-cycle-error (graph-topological-rank graph))))
+
+(deftest graph-longest-path-finds-the-critical-path
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    ;; Both a-b-d and a-c-d have length 2; b sorts first, so b is chosen.
+    (is (equal (graph-longest-path graph) '("a" "b" "d"))))
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c)))
+    (is (equal (graph-longest-path graph) '("a" "b" "c"))))
+  (is (null (graph-longest-path (make-graph))))
+  (with-graph-fixture (graph ((solo "solo")))
+    (is (equal (graph-longest-path graph) '("solo"))))
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b) (b a)))
+    (signals graph-cycle-error (graph-longest-path graph))))
+
+(deftest graph-all-paths-enumerates-simple-paths
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (b d) (c d)))
+    (is (equal (graph-all-paths graph "a" "d")
+               '(("a" "b" "d") ("a" "c" "d")))))
+  ;; FROM = TO is the trivial path.
+  (with-graph-fixture (graph ((a "a")))
+    (is (equal (graph-all-paths graph "a" "a") '(("a")))))
+  ;; b -> a is a back-edge to an already-visited node; exploring it (while a is on
+  ;; the path and is not the target) exercises the visited-node skip.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (a c) (b a)))
+    (is (equal (graph-all-paths graph "a" "c") '(("a" "c")))))
+  (with-graph-fixture (graph ((a "a")))
+    (signals node-not-found-error (graph-all-paths graph "a" "missing"))))
+
+(deftest graph-find-cycle-returns-a-cycle-or-nil
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b c) (c a)))
+    (let ((cycle (graph-find-cycle graph)))
+      (is (equal (first cycle) (car (last cycle))))
+      (is (>= (length cycle) 4))))
+  ;; A self-loop is a length-1 cycle.
+  (with-graph-fixture (graph ((x "x")) :edges ((x x)))
+    (is (equal (graph-find-cycle graph) '("x" "x"))))
+  ;; Acyclic graphs have no cycle.
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b)))
+    (is (null (graph-find-cycle graph)))))
+
+(deftest graph-weighted-distance-runs-dijkstra
+  (let ((graph (%weighted-graph '("a" "b" "c" "d")
+                                '(("a" "b" 2) ("a" "c" 5) ("a" "d" 1)
+                                  ("b" "c" 1) ("b" "d" 10) ("c" "d" 1)))))
+    ;; a -> b -> c costs 3, cheaper than the direct a -> c of 5.
+    (is (= (graph-weighted-distance graph "a" "c") 3))
+    ;; The direct a -> d of 1 beats every longer route.
+    (is (= (graph-weighted-distance graph "a" "d") 1))
+    ;; d is a sink, so nothing is reachable from it.
+    (is (null (graph-weighted-distance graph "d" "a"))))
+  ;; b (cost 1) settles before c (cost 2), so when c later relaxes d it offers a
+  ;; longer route that must be rejected -- exercising the not-shorter relaxation.
+  (let ((graph (%weighted-graph '("a" "b" "c" "d")
+                                '(("a" "b" 1) ("a" "c" 2) ("b" "d" 1) ("c" "d" 1)))))
+    (is (= (graph-weighted-distance graph "a" "d") 2))))
+
+(deftest graph-weighted-distance-defaults-and-parallel-edges
+  ;; With no weights every edge costs the default, so distance is hop count.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c)))
+    (is (= (graph-weighted-distance graph "a" "c") 2)))
+  ;; Parallel edges collapse to the cheapest. Three of them (added dear, cheap,
+  ;; mid) drive both the "cheaper than existing" and "not cheaper" comparisons as
+  ;; the newest-first edge list is folded.
+  (let ((graph (make-graph)))
+    (add-node graph (make-node "a" :outputs '("p1" "p2" "p3")))
+    (add-node graph (make-node "b"))
+    (let ((dear (add-edge graph "a" "b" :from-port "p1"))
+          (cheap (add-edge graph "a" "b" :from-port "p2"))
+          (mid (add-edge graph "a" "b" :from-port "p3")))
+      (setf (edge-metadata dear) '(:weight 5)
+            (edge-metadata cheap) '(:weight 2)
+            (edge-metadata mid) '(:weight 8)))
+    (is (= (graph-weighted-distance graph "a" "b") 2)))
+  ;; FROM = TO resolves only through a cycle.
+  (let ((graph (%weighted-graph '("a" "b") '(("a" "b" 1) ("b" "a" 1)))))
+    (is (= (graph-weighted-distance graph "a" "a") 2))))
+
+(deftest graph-weighted-distance-honours-custom-weight-key-and-default
+  (let ((graph (make-graph)))
+    (dolist (name '("a" "b" "c"))
+      (add-node graph (make-node name)))
+    ;; a -> b carries an explicit :cost of 7; b -> c has no :cost and falls back
+    ;; to the supplied default of 10.
+    (add-edge graph "b" "c")
+    (setf (edge-metadata (add-edge graph "a" "b")) '(:cost 7))
+    (is (= (graph-weighted-distance graph "a" "b" :weight-key :cost :default-weight 10) 7))
+    (is (= (graph-weighted-distance graph "a" "c" :weight-key :cost :default-weight 10) 17))))

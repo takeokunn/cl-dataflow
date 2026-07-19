@@ -27,11 +27,14 @@
 | Graph algorithms | Done | Strongly/weakly connected components, topological generations, transpose, acyclicity, shortest-hop distance, degrees, and immediate neighbors, all over the bulk-query adjacency snapshot. |
 | Graph export | Done | Deterministic Graphviz DOT and Mermaid rendering, plus a `graph-to-plist`/`plist-to-graph` structural round trip. |
 | Graph mutation | Done | `remove-node`, `remove-edge`, induced `graph-subgraph`, disjoint `graph-merge`, and `graph-relabel-node` for editing and composing graphs. |
+| Graph paths | Done | Transitive closure/reduction, topological rank, longest (critical) path, all simple paths, an ordered cycle witness, and weighted (Dijkstra) shortest distance. |
+| Graph metrics | Done | Edge density, degree histogram, bipartiteness, structural `graph-equal-p`, and weak (undirected) reachability. |
 | State-machine analysis | Done | State/event enumeration, reachability, unreachable/terminal-state detection, structural determinism check, and DOT/Mermaid rendering. |
 | State-machine execution | Done | `state-machine-run-states` (visited-state trace), `state-machine-accepts-p` (acceptance), and `state-machine-event-path` (shortest driving event sequence between two states). |
 | Combinators | Done | Handler wrappers (retry, fallback, memoize, tap, map, compose), node wrappers, and result-threading pipeline sequencing. |
 | Streams | Done | A lazy transducer layer (`map`/`filter`/`scan`/`take`/`drop`/`distinct`/`flat-map`/`concat`/`zip`/`tap`) with `collect`/`reduce`/`for-each`/`count`/`first` consumers. |
 | Stream extras | Done | Generators (`iterate`/`repeat`/`cycle`/`enumerate`/`unfold`), windowing (`chunk`/`window`/`partition-by`), and aggregate consumers (`sum`/`min`/`max`/`find`/`some`/`every`/`last`/`nth`). |
+| Stream ops | Done | `zip-with`, `interleave`, `take-nth`, `dedupe-consecutive`, `interpose`, plus collectors `group-by`, `frequencies`, `index-by`, `partition`, `split-at`, `average`. |
 | Observability | Done | Pipeline rendering (`pipeline->dot`/`->mermaid`) and role enumeration, plus `format-trace`, `trace-summary`, and `context-summary` over a run's recorded trace. |
 | Effect ergonomics | Done | `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, and the `with-effect-handler-scope` macro for scoped handler registration. |
 | Protocols | Done | `flow-name`, `flow-metadata`, and `flow-kind` provide consistent introspection across flow objects. |
@@ -122,11 +125,14 @@ nix flake check
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-to-plist`, `plist-to-graph`
 - Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`
+- Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`
+- Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-equal-p`, `graph-undirected-reachable-p`
 - State-machine analysis APIs: `state-machine-states`, `state-machine-event-types`, `state-machine-reachable-states`, `state-machine-unreachable-states`, `state-machine-terminal-states`, `state-machine-deterministic-p`, `state-machine->dot`, `state-machine->mermaid`
 - State-machine execution APIs: `state-machine-run-states`, `state-machine-accepts-p`, `state-machine-event-path`
 - Combinator APIs: `mapping-handler`, `compose-handlers`, `retrying-handler`, `fallback-handler`, `memoizing-handler`, `tapping-handler`, `wrap-node`, `node-with-retry`, `node-with-fallback`, `node-with-memoization`, `node-with-tap`
 - Stream APIs: `flow-stream-p`, `empty-stream`, `list->stream`, `stream-of`, `stream-range`, `stream-map`, `stream-filter`, `stream-scan`, `stream-take`, `stream-drop`, `stream-take-while`, `stream-drop-while`, `stream-distinct`, `stream-flat-map`, `stream-concat`, `stream-zip`, `stream-tap`, `stream-collect`, `stream-reduce`, `stream-for-each`, `stream-count`, `stream-first`, `stream-empty-p`
 - Stream generator/window/aggregate APIs: `stream-iterate`, `stream-repeat`, `stream-cycle`, `stream-enumerate`, `stream-unfold`, `stream-chunk`, `stream-window`, `stream-partition-by`, `stream-sum`, `stream-min`, `stream-max`, `stream-find`, `stream-some`, `stream-every`, `stream-last`, `stream-nth`
+- Stream op/collector APIs: `stream-zip-with`, `stream-interleave`, `stream-take-nth`, `stream-dedupe-consecutive`, `stream-interpose`, `stream-group-by`, `stream-frequencies`, `stream-index-by`, `stream-partition`, `stream-split-at`, `stream-average`
 - Protocols: `flow-name`, `flow-metadata`, `flow-kind` across nodes, edges, graphs, contexts, events, effects, transitions, state machines, and pipelines
 - Testing helpers: `run-pipeline-with-test-context`, `assert-emitted-events`, `assert-performed-effects`, `assert-final-state`, `assert-state-machine-state`, `assert-pipeline-result`
 

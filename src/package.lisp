@@ -89,6 +89,18 @@
     #:graph-subgraph
     #:graph-merge
     #:graph-relabel-node
+    #:graph-transitive-closure
+    #:graph-transitive-reduction
+    #:graph-topological-rank
+    #:graph-longest-path
+    #:graph-all-paths
+    #:graph-find-cycle
+    #:graph-weighted-distance
+    #:graph-density
+    #:graph-degree-histogram
+    #:graph-bipartite-p
+    #:graph-equal-p
+    #:graph-undirected-reachable-p
 
     #:context
     #:context-p
@@ -254,6 +266,17 @@
     #:stream-every
     #:stream-last
     #:stream-nth
+    #:stream-zip-with
+    #:stream-interleave
+    #:stream-take-nth
+    #:stream-dedupe-consecutive
+    #:stream-interpose
+    #:stream-group-by
+    #:stream-frequencies
+    #:stream-index-by
+    #:stream-partition
+    #:stream-split-at
+    #:stream-average
 
     #:run-pipeline-with-test-context
     #:assert-emitted-events
