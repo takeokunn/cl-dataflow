@@ -96,7 +96,7 @@ nix flake check
 - Predicates: `node-p`, `edge-p`, `graph-p`, `context-p`, `event-p`, `effect-p`, `state-transition-p`, `state-machine-p`, `pipeline-p`
 - Node APIs: `node-name`, `node-inputs`, `node-outputs`, `node-handler`, `node-metadata`, `make-node`
 - Edge APIs: `edge-from`, `edge-from-port`, `edge-to`, `edge-to-port`, `edge-metadata`, `make-edge`
-- Graph APIs: `graph-nodes`, `graph-edges`, `graph-metadata`, `make-graph`, `copy-graph`, `add-node`, `add-edge`, `find-node`, `graph-source-nodes`, `graph-sink-nodes`, `graph-reachable-p`, `validate-graph`, `topological-sort`
+- Graph APIs: `graph-nodes`, `graph-edges`, `graph-metadata`, `make-graph`, `copy-graph`, `add-node`, `add-edge`, `find-node`, `graph-source-nodes`, `graph-sink-nodes`, `graph-reachable-p`, `graph-descendants`, `graph-ancestors`, `graph-path`, `validate-graph`, `topological-sort`
 - Context APIs: `make-context`, `copy-context`, `context-values`, `context-value`, `context-node-values`, `context-events`, `context-events-in-order`, `context-event-types`, `context-events-of-type`, `context-effects`, `context-effects-in-order`, `context-effect-types`, `context-effects-of-type`, `context-trace`, `context-trace-in-order`, `context-last-event`, `context-last-effect`, `context-metadata`, `context-effect-handlers`, `context-result`, `context-state`
 - Event APIs: `make-event`, `copy-event`, `emit-event`, `event-type`, `event-payload`, `event-metadata`, `event-trace-index`
 - Effect APIs: `make-effect`, `copy-effect`, `perform-effect`, `effect-type`, `effect-payload`, `effect-metadata`, `effect-trace-index`, `effect-result`
@@ -148,6 +148,7 @@ The library is organized around a small set of composable primitives:
 - State machine transitions are copied on construction and assignment, so caller-owned transition objects do not leak into the machine.
 - State-machine transition failures surface structured condition data, including the current state, event type, and the transition snapshot for guard failures.
 - Graph cycle failures surface the remaining cyclic nodes so callers can inspect the exact component that prevented ordering.
+- `graph-reachable-p`, `graph-descendants`, `graph-ancestors`, and `graph-path` answer reachability questions over the Prolog edge relation: `graph-reachable-p` is the boolean predicate, `graph-descendants` returns every node reachable from a node and `graph-ancestors` returns every node that reaches it (both as name-ordered node snapshots), and `graph-path` returns the node names of a shortest witnessing path (`FROM` first, `TO` last) or `NIL`. All follow the same one-or-more-edges rule and terminate on cyclic graphs.
 - Pipeline stage lists are copied on construction and assignment, so caller-owned stage lists do not leak into the pipeline object.
 - Pipelines copy supplied graphs on construction and assignment, so caller-owned graph mutations do not leak into the pipeline object. When a pipeline is built from a graph, its stage list is remapped onto that copied graph so the pipeline stays internally coherent.
 - Collection readers return snapshots, so callers can inspect state without mutating the live object by accident.
@@ -165,6 +166,14 @@ The library is organized around a small set of composable primitives:
 - `src/protocols.lisp` defines the shared introspection and printing protocols.
 - `src/pipeline.lisp`, `src/events.lisp`, `src/effects.lisp`, and `src/state-machine.lisp` split the runtime behavior into focused files.
 - `src/testing.lisp` contains deterministic test helpers, including state-machine assertions.
+- The graph runtime models edges as a `cl-prolog` fact base. `topological-sort`
+  and `graph-reachable-p` read the edge relation with a single bulk
+  `cl-prolog:query-prolog`, then run linear, stack-safe traversals (Kahn's
+  algorithm and a work-list search) over the materialized adjacency. This uses
+  Prolog as the relational store while deliberately keeping the bounded graph
+  algorithms in Lisp, so cyclic or adversarially deep graphs cannot trigger the
+  non-termination or exponential-path blow-ups that a naive recursive
+  `reachable/2` rule would.
 - `cl-dataflow.asd` loads the library system and routes `asdf:test-system :cl-dataflow` to `cl-dataflow/test`.
 - `examples/` contains runnable scripts that bootstrap the ASDF system for zero-setup demonstrations.
 
@@ -175,6 +184,7 @@ Runnable examples are provided as plain scripts:
 - `examples/simple-pipeline.lisp`
 - `examples/event-workflow.lisp` - a pipeline that emits events and advances a state machine
 - `examples/state-machine.lisp` - a standalone state machine transition flow
+- `examples/graph-analysis.lisp` - reachability analysis (descendants, ancestors, shortest path, boundaries) over a dataflow graph
 
 Run them with SBCL:
 
@@ -182,6 +192,7 @@ Run them with SBCL:
 sbcl --script examples/simple-pipeline.lisp
 sbcl --script examples/event-workflow.lisp
 sbcl --script examples/state-machine.lisp
+sbcl --script examples/graph-analysis.lisp
 ```
 
 Expected outputs:
@@ -189,12 +200,18 @@ Expected outputs:
 - `examples/simple-pipeline.lisp` prints `Simple pipeline result: rendered: 70`
 - `examples/event-workflow.lisp` prints the final workflow state and event trace
 - `examples/state-machine.lisp` prints `Final state: completed`, the transition count, and the last transition record
+- `examples/graph-analysis.lisp` prints the downstream/upstream node sets, the shortest `ingest -> load` path, and the graph's source and sink nodes
 
 ## Testing
 
 The test ASDF system is `cl-dataflow/test`. `asdf:test-system :cl-dataflow`
-dispatches to the cl-weave suite. The suite dogfoods cl-weave property tests
-and custom matchers for generated graph invariants.
+dispatches to the cl-weave suite. The suite dogfoods advanced cl-weave usage:
+property-based generators (`gen-tuple`, `gen-list`, `gen-integer`), custom
+matchers (`:to-have-valid-topological-order`, `:to-be-acyclic`, `:to-reach`),
+differential property tests that cross-check `graph-reachable-p` against an
+independent reference transitive closure over random DAGs, and a
+`:to-run-under-ms` performance guard that keeps deep-graph topological sort and
+reachability from regressing into superlinear behavior.
 
 GitHub Actions runs the CI workflow on `ubuntu-latest` only. Pull requests run
 the same `nix flake check` and coverage build as local verification, and the

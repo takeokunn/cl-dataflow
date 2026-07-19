@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Added `graph-descendants` and `graph-ancestors` public readers that return every node reachable from (respectively, able to reach) a given node, as name-ordered node snapshots. They reuse the bulk-query adjacency traversal, so they are linear and terminate on cyclic graphs, and are cross-checked against a reference transitive closure in the property suite.
+- Added `graph-path`, which returns the node names of a shortest witnessing path between two nodes (or `NIL` when unreachable) via breadth-first search over the same adjacency, completing the reachability API family and property-checked for validity and agreement with `graph-reachable-p`.
+- Upgraded the pinned `cl-prolog` (0.6.0) and `cl-weave` (0.8.0) dependencies to their latest revisions.
+- Made the flake reference the architecture-independent `cl-prolog` source tree directly, so the dev shell, checks, and `nix run` work on every system now that upstream ships Linux-only per-system packages.
+- Rebuilt `topological-sort` to read the full edge relation with a single bulk `cl-prolog:query-prolog` call and drain a merge-ordered ready queue, cutting it from O(V*E) Prolog work plus a per-iteration re-sort down to linear adjacency construction with the same deterministic order.
+- Rebuilt `graph-reachable-p` to materialize the successor relation once and walk it with an explicit work list, so deep graphs no longer overflow the control stack and reachability issues one Prolog query instead of two per visited node.
+- Derived source/sink boundary nodes (`graph-source-nodes`, `graph-sink-nodes`) and pipeline sink-result collection from a single adjacency snapshot instead of a per-node Prolog query that rebuilt the whole rulebase each time, cutting pipeline result collection from O(V^2 + V*E) to linear.
+- Stopped the `graph-nodes` and `graph-edges` readers from running a full topological sort on every call: they now perform only cheap O(V+E) structural validation, so reads are no longer superlinear and a legally constructed cyclic graph stays inspectable and copyable.
+- Fixed guarded state-machine transition selection: when several transitions share a `(state, event)` pair, a rejecting guard now falls through to the next candidate, and `guard-failed-error` is signalled only when every matching guard rejects. `state-machine-can-step-p` uses the same guard-aware selection.
+- Fixed `define-pipeline` and `define-workflow` to evaluate a `:metadata`/`:pipeline-metadata` form once instead of twice, and to gensym their internal `graph`, `edge`, and `machine` bindings so user handler/guard/action forms can no longer capture them.
+- Made `%normalize-name` bind the printer control variables so non-symbol node/port designators normalize deterministically regardless of the caller's `*print-base*` and related bindings.
+- Added advanced cl-weave coverage: custom matchers (`:to-be-acyclic`, `:to-reach`), differential property tests that cross-check `graph-reachable-p` against a reference transitive closure over random DAGs, model-based/stateful tests that replay `gen-state-machine` traces through `run-state-machine` and compare against a reference transition model, determinism checks, guarded-selection tests, and `:to-run-under-ms` performance/anti-DoS guards for deep chains, exponential-path lattices (WIDTH^(LAYERS-1) distinct paths), and large directed cycles -- locking in that reachability stays linear and terminating on the shapes a naive recursive Prolog rule would blow up on.
 - Added a single `./scripts/verify.sh` entrypoint for tests and example smoke checks.
 - Documented the verification script in the README and contributing guide.
 - Exported detail readers for effect and state-machine error conditions so callers can inspect failures directly.
