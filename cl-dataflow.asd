@@ -24,6 +24,7 @@ helpers, all behind a single public package."
                 (:file "pipeline")
                 (:file "graph-algorithms")
                 (:file "graph-export")
+                (:file "state-machine-analysis")
                 (:file "testing"))
   :in-order-to ((test-op (test-op "cl-dataflow/test"))))
 
@@ -49,6 +50,7 @@ helpers, all behind a single public package."
                 (:file "cl-weave-advanced-test")
                 (:file "graph-advanced-property-test")
                 (:file "graph-algorithms-test")
-                (:file "graph-export-test"))
+                (:file "graph-export-test")
+                (:file "state-machine-analysis-test"))
   :perform (test-op (o c)
     (uiop:symbol-call '#:cl-dataflow.test '#:run-tests)))

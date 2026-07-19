@@ -184,7 +184,15 @@
     step-state-machine
     run-state-machine
     run-state-machine-with-context
-    make-state-machine-node)
+    make-state-machine-node
+    state-machine-states
+    state-machine-event-types
+    state-machine-reachable-states
+    state-machine-unreachable-states
+    state-machine-terminal-states
+    state-machine-deterministic-p
+    state-machine->dot
+    state-machine->mermaid)
   (:pipeline
     pipeline
     pipeline-p
