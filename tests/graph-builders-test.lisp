@@ -83,3 +83,18 @@
       (is (find-node graph "b")))
     (signals node-not-found-error (graph-relabel-node graph "missing" "z"))
     (signals graph-error (graph-relabel-node graph "a" "b"))))
+
+(deftest graph-contract-edge-merges-nodes
+  ;; Merge b into a: a->b becomes a self-loop (dropped); b->c becomes a->c which
+  ;; dedups with the existing a->c; d->b becomes d->a.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (b c) (d b) (a c)))
+    (let ((contracted (graph-contract-edge graph "a" "b")))
+      (is (equal (graph-node-names contracted) '("a" "c" "d")))
+      (is (= (graph-size contracted) 2))
+      (is (graph-reachable-p contracted "d" "a"))
+      (is (graph-reachable-p contracted "a" "c"))
+      ;; The original is unchanged.
+      (is (= (graph-order graph) 4)))
+    (signals invalid-input-error (graph-contract-edge graph "a" "a"))))

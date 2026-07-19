@@ -119,6 +119,7 @@
     graph-subgraph
     graph-merge
     graph-relabel-node
+    graph-contract-edge
     graph-transitive-closure
     graph-transitive-reduction
     graph-topological-rank

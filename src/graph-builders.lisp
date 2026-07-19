@@ -88,6 +88,46 @@ GRAPH-A's). Neither input is modified."
         (%readd-edge result edge)))
     result))
 
+(defun graph-contract-edge (graph from to)
+  "Return a new graph with node TO merged into node FROM: every edge incident to TO
+is redirected to FROM (a redirected endpoint attaches to FROM's first port), edges
+that become self-loops through the merge are dropped, and resulting duplicate edges
+collapse (the first edge's metadata wins). FROM and TO must be distinct existing
+nodes; signals INVALID-INPUT-ERROR otherwise. GRAPH is not modified."
+  (let ((from-name (%node-designator-name from))
+        (to-name (%node-designator-name to)))
+    (%ensure-graph-node graph from-name)
+    (%ensure-graph-node graph to-name)
+    (when (equal from-name to-name)
+      (error 'invalid-input-error
+             :expected 'distinct-nodes
+             :value from-name
+             :detail "GRAPH-CONTRACT-EDGE requires two distinct nodes."))
+    (let* ((nodes (%graph-nodes-table graph))
+           (from-node (gethash from-name nodes))
+           (from-out (first (%node-outputs-list from-node)))
+           (from-in (first (%node-inputs-list from-node)))
+           (result (make-graph :metadata (graph-metadata graph)))
+           (seen (make-hash-table :test #'equal)))
+      (dolist (name (%graph-node-name-set graph))
+        (unless (equal name to-name)
+          (add-node result (%copy-node-snapshot (gethash name nodes)))))
+      (dolist (edge (reverse (%graph-edges-list graph)))
+        (let* ((from-changed (equal (edge-from edge) to-name))
+               (to-changed (equal (edge-to edge) to-name))
+               (new-from (if from-changed from-name (edge-from edge)))
+               (new-to (if to-changed from-name (edge-to edge)))
+               (new-from-port (if from-changed from-out (edge-from-port edge)))
+               (new-to-port (if to-changed from-in (edge-to-port edge))))
+          (unless (equal new-from new-to)
+            (let ((key (%edge-identity-key new-from new-from-port new-to new-to-port)))
+              (unless (gethash key seen)
+                (setf (gethash key seen) t)
+                (let ((added (add-edge result new-from new-to
+                                       :from-port new-from-port :to-port new-to-port)))
+                  (setf (edge-metadata added) (edge-metadata edge))))))))
+      result)))
+
 (defun %relabel-name (name old new)
   (if (equal name old) new name))
 

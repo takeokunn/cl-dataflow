@@ -143,7 +143,7 @@ nix flake check
 - Effect ergonomics APIs: `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, `with-effect-handler-scope`
 - Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
 - Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-layout`, `graph-to-plist`, `plist-to-graph`
-- Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`
+- Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`, `graph-contract-edge`
 - Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`, `graph-weighted-path`
 - Equality/reachability predicate APIs: `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p`, `state-machine-reachable-p`
 - Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-equal-p`, `graph-undirected-reachable-p`
