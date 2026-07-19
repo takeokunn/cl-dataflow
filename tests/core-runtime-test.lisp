@@ -333,7 +333,9 @@
     subject-drop
     subject-take-while
     subject-drop-while
-    subject-count)
+    subject-count
+    subject-flat-map
+    subject-partition)
   (:streams
     flow-stream-p
     empty-stream
@@ -385,6 +387,7 @@
     stream-partition
     stream-split-at
     stream-average
+    stream-distinct-by
     stream-flatten
     stream-scan1
     stream-count-if

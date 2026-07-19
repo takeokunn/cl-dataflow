@@ -303,6 +303,8 @@
     #:subject-take-while
     #:subject-drop-while
     #:subject-count
+    #:subject-flat-map
+    #:subject-partition
 
     #:flow-stream-p
     #:empty-stream
@@ -354,6 +356,7 @@
     #:stream-partition
     #:stream-split-at
     #:stream-average
+    #:stream-distinct-by
     #:stream-flatten
     #:stream-scan1
     #:stream-count-if

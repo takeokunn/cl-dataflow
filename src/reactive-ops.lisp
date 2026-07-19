@@ -144,6 +144,31 @@ PREDICATE, then re-emits every value from the first that does not onward."
                            (subject-emit result value))))
     result))
 
+(defun subject-flat-map (subject function)
+  "Return a derived subject that, for each value V of SUBJECT, calls FUNCTION to
+obtain an inner subject and forwards all of that inner subject's later emissions.
+The higher-order (flatten) reactive operator."
+  (let ((result (make-subject)))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (subject-subscribe (funcall function value)
+                                            (lambda (inner-value)
+                                              (subject-emit result inner-value)))))
+    result))
+
+(defun subject-partition (subject predicate)
+  "Return (VALUES MATCHING NON-MATCHING): two derived subjects that split SUBJECT's
+values by PREDICATE -- each value is emitted on MATCHING when PREDICATE holds, and
+on NON-MATCHING otherwise."
+  (let ((matching (make-subject))
+        (non-matching (make-subject)))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (if (funcall predicate value)
+                             (subject-emit matching value)
+                             (subject-emit non-matching value))))
+    (values matching non-matching)))
+
 (defun subject-count (subject)
   "Return a derived subject that emits the running count of source emissions
 (1, 2, 3, ...)."

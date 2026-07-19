@@ -87,6 +87,28 @@ collapsed to a single element. Non-adjacent duplicates are kept."
            (cons (car step)
                  (%stream-interpose-rest separator (cdr step))))))))
 
+(defun %stream-distinct-by (function stream seen test)
+  (%make-flow-stream
+   (lambda ()
+     (let ((current stream)
+           (already seen))
+       (loop
+         (let ((step (%stream-step current)))
+           (cond ((eq step :end) (return :end))
+                 ((member (funcall function (car step)) already :test test)
+                  (setf current (cdr step)))
+                 (t (return (cons (car step)
+                                  (%stream-distinct-by function
+                                                       (cdr step)
+                                                       (cons (funcall function (car step)) already)
+                                                       test)))))))))))
+
+(defun stream-distinct-by (function stream &key (test 'equal))
+  "Return a stream of the elements of STREAM whose key (FUNCALL FUNCTION ELEMENT) has
+not appeared before (under TEST), keeping the first element for each key. The
+key-projected analog of STREAM-DISTINCT; O(n^2) in the number of distinct keys."
+  (%stream-distinct-by function stream '() test))
+
 ;;; --- Terminal collectors -------------------------------------------------
 
 (defun %stream-group-into (stream key-function value-function)

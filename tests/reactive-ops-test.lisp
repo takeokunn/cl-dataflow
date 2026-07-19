@@ -90,3 +90,25 @@
          (collector (subject-collect counted)))
     (dolist (value '(:a :b :c)) (subject-emit source value))
     (is (equal (funcall collector) '(1 2 3)))))
+
+(deftest subject-flat-map-forwards-inner-emissions
+  (let* ((source (make-subject))
+         (inner-a (make-subject))
+         (inner-b (make-subject))
+         (flattened (subject-flat-map source (lambda (v) (if (eq v :a) inner-a inner-b))))
+         (collector (subject-collect flattened)))
+    (subject-emit source :a)   ; subscribe to inner-a
+    (subject-emit source :b)   ; subscribe to inner-b
+    (subject-emit inner-a 1)
+    (subject-emit inner-b 2)
+    (subject-emit inner-a 3)
+    (is (equal (funcall collector) '(1 2 3)))))
+
+(deftest subject-partition-splits-by-predicate
+  (let ((source (make-subject)))
+    (multiple-value-bind (evens odds) (subject-partition source #'evenp)
+      (let ((even-log (subject-collect evens))
+            (odd-log (subject-collect odds)))
+        (dolist (value '(1 2 3 4 5 6)) (subject-emit source value))
+        (is (equal (funcall even-log) '(2 4 6)))
+        (is (equal (funcall odd-log) '(1 3 5)))))))

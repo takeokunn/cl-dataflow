@@ -68,3 +68,10 @@
   (is (= (stream-average (stream-of 1 2 3 4)) 5/2))
   (is (= (stream-average (stream-of '(:v 10) '(:v 20)) :key #'second) 15))
   (is (null (stream-average (empty-stream)))))
+
+(deftest stream-distinct-by-dedupes-on-a-key
+  ;; Keep the first element for each (mod x 3) key: 1(1),4(dup),2(2),5(dup),3(0).
+  (is (equal (stream-collect (stream-distinct-by (lambda (x) (mod x 3))
+                                                 (stream-of 1 4 2 5 3)))
+             '(1 2 3)))
+  (is (null (stream-collect (stream-distinct-by #'identity (empty-stream))))))
