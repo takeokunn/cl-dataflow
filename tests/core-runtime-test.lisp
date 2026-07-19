@@ -222,6 +222,30 @@
     flow-name
     flow-metadata
     flow-kind)
+  (:streams
+    flow-stream-p
+    empty-stream
+    list->stream
+    stream-of
+    stream-range
+    stream-map
+    stream-filter
+    stream-scan
+    stream-take
+    stream-drop
+    stream-take-while
+    stream-drop-while
+    stream-distinct
+    stream-flat-map
+    stream-concat
+    stream-zip
+    stream-tap
+    stream-collect
+    stream-reduce
+    stream-for-each
+    stream-count
+    stream-first
+    stream-empty-p)
   (:testing
     run-pipeline-with-test-context
     assert-emitted-events
