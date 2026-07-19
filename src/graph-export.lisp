@@ -111,6 +111,18 @@ and metadata -- everything needed to persist, diff, or transmit a graph's shape.
                          (%graph-node-name-set graph))
           :edges (mapcar #'%edge-to-plist (%sorted-edge-snapshots graph)))))
 
+(defun graph-layout (graph)
+  "Return an alist (NAME . (LAYER . INDEX)) assigning each node a layer -- its
+topological generation, with sources at layer 0 -- and a 0-based INDEX within that
+layer in name order. This provides coordinates for laying out a DAG in custom
+renderers (DOT and Mermaid delegate layout to their own engines). Signals
+GRAPH-CYCLE-ERROR when GRAPH is cyclic."
+  (loop for layer in (graph-topological-generations graph)
+        for layer-number from 0
+        append (loop for node in layer
+                     for index from 0
+                     collect (cons (node-name node) (cons layer-number index)))))
+
 (defun plist-to-graph (plist)
   "Rebuild a graph from a plist produced by GRAPH-TO-PLIST. Reconstructed nodes
 use the default identity handler (see GRAPH-TO-PLIST for why handlers are not

@@ -82,6 +82,7 @@
     #:graph-distance
     #:graph->dot
     #:graph->mermaid
+    #:graph-layout
     #:graph-to-plist
     #:plist-to-graph
     #:remove-node
@@ -114,6 +115,7 @@
     #:graph-difference
     #:graph-filter-nodes
     #:graph-map-nodes
+    #:graph-diff
     #:graph-articulation-points
     #:graph-bridges
 

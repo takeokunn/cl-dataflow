@@ -61,3 +61,16 @@
     (is (null (getf plist :nodes)))
     (is (null (getf plist :edges)))
     (is (graph-empty-p (plist-to-graph plist)))))
+
+(deftest graph-layout-assigns-layers-and-indices
+  (with-graph-fixture (graph
+                       ((s "s") (a "a") (b "b") (z "sink"))
+                       :edges ((s a) (s b) (a z) (b z)))
+    (let ((layout (graph-layout graph)))
+      ;; s at layer 0; a and b at layer 1 (indices 0,1); sink at layer 2.
+      (is (equal (cdr (assoc "s" layout :test #'equal)) '(0 . 0)))
+      (is (equal (cdr (assoc "a" layout :test #'equal)) '(1 . 0)))
+      (is (equal (cdr (assoc "b" layout :test #'equal)) '(1 . 1)))
+      (is (equal (cdr (assoc "sink" layout :test #'equal)) '(2 . 0)))))
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b) (b a)))
+    (signals graph-cycle-error (graph-layout graph))))

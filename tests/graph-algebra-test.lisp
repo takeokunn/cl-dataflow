@@ -59,3 +59,19 @@
     (is (graph-reachable-p mapped "n-a" "n-b"))
     ;; The original is unchanged.
     (is (equal (graph-node-names graph) '("a" "b")))))
+
+(deftest graph-diff-reports-added-and-removed
+  (let ((before (%simple-graph '("a" "b" "c") '(("a" "b") ("b" "c"))))
+        (after (%simple-graph '("b" "c" "d") '(("b" "c") ("c" "d")))))
+    (let ((diff (graph-diff before after)))
+      ;; d is added, a is removed; c->d added, a->b removed; b->c unchanged.
+      (is (equal (getf diff :added-nodes) '("d")))
+      (is (equal (getf diff :removed-nodes) '("a")))
+      (is (equal (getf diff :added-edges) '(("c" "value" "d" "value"))))
+      (is (equal (getf diff :removed-edges) '(("a" "value" "b" "value"))))))
+  ;; Identical graphs diff to nothing.
+  (let ((g (%simple-graph '("a" "b") '(("a" "b")))))
+    (let ((diff (graph-diff g g)))
+      (is (null (getf diff :added-nodes)))
+      (is (null (getf diff :added-edges)))
+      (is (null (getf diff :removed-edges))))))
