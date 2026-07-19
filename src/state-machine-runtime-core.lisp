@@ -86,11 +86,30 @@
     (event (event-type event))
     (t (%normalize-name event))))
 
-(defun %find-transition (machine event-type)
+(defun %transition-matches-p (transition machine event-type)
+  (and (string-equal (transition-from transition) (state-machine-state machine))
+       (string-equal (transition-event-type transition) event-type)))
+
+(defun %matching-transitions (machine event-type)
+  "Every transition whose FROM state and EVENT-TYPE match MACHINE's current state."
+  (remove-if-not (lambda (transition)
+                   (%transition-matches-p transition machine event-type))
+                 (%state-machine-transitions-list machine)))
+
+(defun %transition-guard-satisfied-p (transition machine event context)
+  (let ((guard (transition-guard transition)))
+    (or (null guard)
+        (funcall guard machine event context))))
+
+(defun %select-transition (machine event context matches)
+  "Return the first MATCH whose guard is absent or satisfied, else NIL.
+
+Guards are the mechanism for choosing among transitions that share the same
+FROM state and event, so a rejecting guard falls through to the next candidate
+instead of aborting the whole step."
   (find-if (lambda (transition)
-             (and (string-equal (transition-from transition) (state-machine-state machine))
-                  (string-equal (transition-event-type transition) event-type)))
-           (%state-machine-transitions-list machine)))
+             (%transition-guard-satisfied-p transition machine event context))
+           matches))
 
 (defun %transition-error-detail (machine event-type &optional (detail "No transition"))
   (format nil "~A from ~A on event ~A" detail

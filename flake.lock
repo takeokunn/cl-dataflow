@@ -9,11 +9,11 @@
         "paredit-cli": "paredit-cli"
       },
       "locked": {
-        "lastModified": 1783865821,
-        "narHash": "sha256-RaC1OGNUqXYqTFZ4sGu2zlvnqJInuDpuH8nAWdE4INQ=",
+        "lastModified": 1784437549,
+        "narHash": "sha256-1WRrmNeniD1w1euhGhOCEpQoPVum5M2G6JVESAHzW1w=",
         "owner": "takeokunn",
         "repo": "cl-prolog",
-        "rev": "682ffc498ffc9a79073c87b29d8f4917702cc14b",
+        "rev": "b3049ad4f616e9b5cfc6987b1449b3f0920b1323",
         "type": "github"
       },
       "original": {
@@ -56,11 +56,11 @@
         "paredit-cli": "paredit-cli_2"
       },
       "locked": {
-        "lastModified": 1783868526,
-        "narHash": "sha256-7WsmsgAiE9WfkQal5UkgkiNyqruO7jDCS4dNQXkBw6A=",
+        "lastModified": 1784441992,
+        "narHash": "sha256-ucrWD3PjamiyJ0wKhwaatGcHWicSDI3f89E4uvkeupA=",
         "owner": "takeokunn",
         "repo": "cl-weave",
-        "rev": "9d40fb96d1bde7b6a6fe0df15cdfb95db5f9f054",
+        "rev": "985445109abe773fb96c479e4abdcc9e747c62bb",
         "type": "github"
       },
       "original": {
@@ -140,11 +140,11 @@
         "treefmt-nix": "treefmt-nix_3"
       },
       "locked": {
-        "lastModified": 1783857741,
-        "narHash": "sha256-PQ3z+CVNmO+cmtyR2Hjjqb2Y1qPv9Rtemk3lX44pN6k=",
+        "lastModified": 1784440580,
+        "narHash": "sha256-4BNrL/lfP+fOmOXZlaTcjrIhnruc6qWu9JhfRFb9P+w=",
         "owner": "takeokunn",
         "repo": "paredit-cli",
-        "rev": "88057e5be197a6e7a90563e54c73ba31d4dc6273",
+        "rev": "f5404152d79447c230646a2cbe6ffb575c5d2f7a",
         "type": "github"
       },
       "original": {

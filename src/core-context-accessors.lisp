@@ -1,14 +1,19 @@
 (in-package #:cl-dataflow)
 
 (defun graph-nodes (graph)
-  (validate-graph graph)
+  ;; Readers verify structural integrity (ports, edge endpoints) but not
+  ;; acyclicity: the old topological-sort on every read was O(V*E) Prolog work
+  ;; and, worse, raised on a legally constructed cyclic graph, making it
+  ;; impossible to inspect or copy. Acyclicity stays at the explicit entry
+  ;; points (validate-graph, topological-sort, pipeline construction).
+  (%validate-graph-structure graph)
   (%copy-node-table-snapshot (slot-value graph 'nodes)))
 
 (defun (setf graph-nodes) (nodes graph)
   (setf (slot-value graph 'nodes) (%copy-node-table-snapshot nodes)))
 
 (defun graph-edges (graph)
-  (validate-graph graph)
+  (%validate-graph-structure graph)
   (mapcar #'%copy-edge-snapshot (slot-value graph 'edges)))
 
 (defun (setf graph-edges) (edges graph)

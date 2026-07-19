@@ -2,8 +2,12 @@
   (:use #:cl #:cl-dataflow)
   (:import-from #:cl-weave
                 #:defmatcher
+                #:expect
                 #:gen-integer
                 #:gen-list
+                #:gen-member
+                #:gen-state-machine
+                #:gen-tuple
                 #:it-property
                 #:signals)
   (:export #:run-tests))

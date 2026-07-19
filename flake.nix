@@ -66,7 +66,11 @@
         let
           system = pkgs.stdenv.hostPlatform.system;
           src = sourceFor pkgs;
-          prologSource = "${cl-prolog.packages.${system}.default}//";
+          # cl-prolog is architecture-independent Lisp source, and upstream now
+          # ships Linux-only per-system packages, so reference the flake source
+          # tree directly. Its cl-prolog.asd sits at the root, which the trailing
+          # "//" recursive marker in CL_SOURCE_REGISTRY discovers on every system.
+          prologSource = "${cl-prolog.outPath}//";
           weave = cl-weave.packages.${system}.default;
           sourceRegistry = "${prologSource}:${weave}/share/common-lisp/source//:$PWD//:";
           mkWeaveCheck =
@@ -144,9 +148,7 @@
             name = "cl-dataflow-test";
             runtimeInputs = [ weave ];
             text = ''
-              export CL_SOURCE_REGISTRY="${
-                cl-prolog.packages.${system}.default
-              }//:${weave}/share/common-lisp/source//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
+              export CL_SOURCE_REGISTRY="${cl-prolog.outPath}//:${weave}/share/common-lisp/source//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
               exec cl-weave run cl-dataflow/test "$@"
             '';
           };
@@ -169,12 +171,11 @@
             packages = [
               pkgs.nixfmt
               pkgs.sbcl
-              cl-prolog.packages.${system}.default
               cl-weave.packages.${system}.default
               paredit-cli.packages.${system}.default
             ];
             shellHook = ''
-              export CL_SOURCE_REGISTRY="${cl-prolog.packages.${system}.default}//:${
+              export CL_SOURCE_REGISTRY="${cl-prolog.outPath}//:${
                 cl-weave.packages.${system}.default
               }/share/common-lisp/source//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
             '';

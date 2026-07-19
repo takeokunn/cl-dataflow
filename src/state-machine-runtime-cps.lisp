@@ -7,24 +7,21 @@
           :detail ,detail
           ,@initargs))
 
-(defun %resolve-transition/cps (machine event-type continuation)
-  (let ((transition (%find-transition machine event-type)))
-    (unless transition
+(defun %resolve-transition/cps (machine event context event-type continuation)
+  (let ((matches (%matching-transitions machine event-type)))
+    (unless matches
       (%signal-state-machine-error invalid-transition-error
                                    machine
                                    event-type
                                    (%transition-error-detail machine event-type)))
-    (funcall continuation transition)))
-
-(defun %ensure-transition-guard/cps (machine transition event context event-type continuation)
-  (let ((guard (transition-guard transition)))
-    (when (and guard (not (funcall guard machine event context)))
-      (%signal-state-machine-error guard-failed-error
-                                   machine
-                                   event-type
-                                   (%guard-error-detail machine event-type)
-                                   :transition (%copy-state-transition transition)))
-    (funcall continuation transition)))
+    (let ((transition (%select-transition machine event context matches)))
+      (unless transition
+        (%signal-state-machine-error guard-failed-error
+                                     machine
+                                     event-type
+                                     (%guard-error-detail machine event-type)
+                                     :transition (%copy-state-transition (first matches))))
+      (funcall continuation transition))))
 
 (defun %run-transition-action/cps (machine transition event context continuation)
   (let ((action (transition-action transition))
@@ -88,30 +85,25 @@
 (defun %step-state-machine/cps (machine event context event-type continuation)
   (%resolve-transition/cps
    machine
+   event
+   context
    event-type
    (lambda (transition)
-     (%ensure-transition-guard/cps
+     (%run-transition/cps
       machine
       transition
       event
       context
       event-type
-      (lambda (guarded-transition)
-        (%run-transition/cps
-         machine
-         guarded-transition
-         event
-         context
-         event-type
-         (lambda (transition event-type previous-state next-state action-result)
-           (%commit-transition/cps machine
-                                   context
-                                   transition
-                                   event-type
-                                   previous-state
-                                   next-state
-                                   action-result
-                                   continuation))))))))
+      (lambda (transition event-type previous-state next-state action-result)
+        (%commit-transition/cps machine
+                                context
+                                transition
+                                event-type
+                                previous-state
+                                next-state
+                                action-result
+                                continuation))))))
 
 (defun %run-state-machine-events/cps (machine events context continuation)
   (labels ((advance-events (remaining-events transition-records)

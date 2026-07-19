@@ -68,9 +68,13 @@
         values)))
 
 (defun %sink-nodes-in-order (graph order)
-  (remove-if-not (lambda (node)
-                   (%sink-node-p graph node))
-                 order))
+  ;; Sinks are the nodes with no outgoing edge. Deriving them from one adjacency
+  ;; snapshot keeps pipeline result collection linear; the previous per-node
+  ;; predicate rebuilt the whole Prolog rulebase for every node in ORDER.
+  (let ((successors (%graph-adjacency graph (%graph-rulebase graph))))
+    (remove-if-not (lambda (node)
+                     (null (gethash (node-name node) successors)))
+                   order)))
 
 (defun %collect-sink-results (graph context order)
   (let ((sinks (mapcar (lambda (node)

@@ -5,34 +5,28 @@
                     (equal (edge-to edge) node-name))
                   (%graph-edges-list graph)))
 
-(defun %source-node-p (graph node &optional (rulebase (%graph-rulebase graph)))
-  (null (%graph-predecessor-names graph rulebase (node-name node))))
-
-(defun %sink-node-p (graph node &optional (rulebase (%graph-rulebase graph)))
-  (null (%graph-successor-names graph rulebase (node-name node))))
-
-(progn
-  (defun %boundary-nodes (graph boundary-predicate)
-    (let ((rulebase (%graph-rulebase graph)))
+(defun %boundary-nodes (graph boundary-key)
+  "Copies of the graph's source (BOUNDARY-KEY :source) or sink (:sink) nodes in
+topological order. Boundaries are read from a single adjacency snapshot -- a node
+with indegree 0 is a source, a node with no successors is a sink -- instead of a
+Prolog query per node."
+  (let ((rulebase (%graph-rulebase graph)))
+    (multiple-value-bind (successors indegree)
+        (%graph-adjacency graph rulebase)
       (mapcar #'%copy-node-snapshot
-              (remove-if-not (lambda (node)
-                                (funcall boundary-predicate graph node rulebase))
-                              (topological-sort graph)))))
+              (remove-if-not
+                (lambda (node)
+                  (let ((name (node-name node)))
+                    (ecase boundary-key
+                      (:source (zerop (gethash name indegree)))
+                      (:sink (null (gethash name successors))))))
+                (topological-sort graph))))))
 
-  (defun graph-source-nodes (graph)
-    (%boundary-nodes graph #'%source-node-p)))
+(defun graph-source-nodes (graph)
+  (%boundary-nodes graph :source))
 
 (defun graph-sink-nodes (graph)
-  (%boundary-nodes graph #'%sink-node-p))
-
-(defun %initialize-topological-state (graph nodes rulebase)
-  (let ((indegree (%make-result-table)))
-    (maphash (lambda (name node)
-                (declare (ignore node))
-                (setf (gethash name indegree)
-                      (length (%graph-predecessor-names graph rulebase name))))
-              nodes)
-    indegree))
+  (%boundary-nodes graph :sink))
 
 (defun %seed-topological-queue (indegree)
   (let ((queue '()))
@@ -43,19 +37,26 @@
               indegree)
     (sort queue #'string<)))
 
-(defun %drain-topological-queue (graph queue nodes indegree rulebase)
+(defun %drain-topological-queue (queue successors indegree nodes)
+  "Kahn's algorithm over precomputed SUCCESSORS/INDEGREE tables.
+
+The ready queue is kept in string< order by merging each batch of newly-ready
+successors into it, so it never re-sorts the whole queue per iteration yet still
+pops the lexicographically smallest ready node -- giving a deterministic order
+identical to the previous full-re-sort implementation."
   (let ((result '())
         (processed (%make-result-table)))
     (loop while queue do
       (let* ((name (pop queue))
-              (node (gethash name nodes)))
+              (node (gethash name nodes))
+              (newly-ready '()))
         (push node result)
         (setf (gethash name processed) t)
-        (dolist (successor (%graph-successor-names graph rulebase name))
-          (decf (gethash successor indegree))
-          (when (zerop (gethash successor indegree))
-            (push successor queue)))
-        (setf queue (sort queue #'string<))))
+        (dolist (successor (gethash name successors))
+          (when (zerop (decf (gethash successor indegree)))
+            (push successor newly-ready)))
+        (when newly-ready
+          (setf queue (merge 'list queue (sort newly-ready #'string<) #'string<)))))
     (values (nreverse result) processed)))
 
 (defun %unprocessed-cycle-nodes (nodes processed)
@@ -67,21 +68,19 @@
     (sort cycle-nodes #'string< :key #'node-name)))
 
 (defun topological-sort (graph)
-  (let* ((nodes (%graph-nodes-table graph))
-          (rulebase (%graph-rulebase graph))
-          (result nil)
-          (processed nil))
-    (let ((indegree (%initialize-topological-state graph nodes rulebase)))
-      (multiple-value-setq (result processed)
-        (%drain-topological-queue graph
-                                  (%seed-topological-queue indegree)
-                                  nodes
-                                  indegree
-                                  rulebase)))
-    (unless (= (length result) (hash-table-count nodes))
-      (error 'graph-cycle-error
-              :graph graph
-              :nodes (mapcar #'%copy-node-snapshot
-                            (%unprocessed-cycle-nodes nodes processed))
-              :detail "Graph contains a cycle or disconnected cycle component."))
-    result))
+  (let ((nodes (%graph-nodes-table graph))
+        (rulebase (%graph-rulebase graph)))
+    (multiple-value-bind (successors indegree)
+        (%graph-adjacency graph rulebase)
+      (multiple-value-bind (result processed)
+          (%drain-topological-queue (%seed-topological-queue indegree)
+                                    successors
+                                    indegree
+                                    nodes)
+        (unless (= (length result) (hash-table-count nodes))
+          (error 'graph-cycle-error
+                  :graph graph
+                  :nodes (mapcar #'%copy-node-snapshot
+                                (%unprocessed-cycle-nodes nodes processed))
+                  :detail "Graph contains a cycle or disconnected cycle component."))
+        result))))
