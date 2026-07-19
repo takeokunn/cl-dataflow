@@ -116,4 +116,9 @@ assertions. Prefers a system SBCL, then falls back to `nix run nixpkgs#sbcl`."
   (example-state-machine-script-runs
    "examples/state-machine.lisp"
    "Final state: completed"
-   "Transition count: 2"))
+   "Transition count: 2")
+  (example-graph-analysis-script-runs
+   "examples/graph-analysis.lisp"
+   "Downstream of parse"
+   "Shortest path ingest -> load"
+   "Sources: (\"ingest\")"))

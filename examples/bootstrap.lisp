@@ -23,9 +23,17 @@
     (when evaluator-mode
       (setf (symbol-value evaluator-mode) :interpret))))
 
+;; The graph runtime reads CL-PROLOG: symbols, so the cl-prolog system must be
+;; loaded before any cl-dataflow source file is read. find-symbol avoids a
+;; read-time dependency on the ASDF package existing in this bootstrap file.
+(defun ensure-dependencies ()
+  (require :asdf)
+  (funcall (find-symbol "LOAD-SYSTEM" "ASDF") "cl-prolog"))
+
 (progn
   (defun load-cl-dataflow ()
     (use-interpreted-loading-when-available)
+    (ensure-dependencies)
     (let ((root (repository-directory)))
       (dolist (source-file *cl-dataflow-source-files*)
         (load (merge-pathnames source-file root)))))

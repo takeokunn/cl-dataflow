@@ -88,6 +88,9 @@
     graph-source-nodes
     graph-sink-nodes
     graph-reachable-p
+    graph-descendants
+    graph-ancestors
+    graph-path
     validate-graph
     topological-sort)
   (:context
