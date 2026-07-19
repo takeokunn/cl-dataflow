@@ -30,6 +30,7 @@
 | Graph paths | Done | Transitive closure/reduction, topological rank, longest (critical) path, all simple paths, an ordered cycle witness, and weighted (Dijkstra) shortest distance. |
 | Graph metrics | Done | Edge density, degree histogram, bipartiteness, structural `graph-equal-p`, and weak (undirected) reachability. |
 | Graph connectivity | Done | Weak/strong connectivity predicates, self-loop nodes, the SCC condensation DAG, single-source distances, eccentricity, and diameter. |
+| Graph algebra | Done | Set operations `graph-union`, `graph-intersection`, `graph-difference`, plus `graph-filter-nodes` (predicate-induced subgraph) and `graph-map-nodes` (injective relabel). |
 | State-machine analysis | Done | State/event enumeration, reachability, unreachable/terminal-state detection, structural determinism check, and DOT/Mermaid rendering. |
 | State-machine execution | Done | `state-machine-run-states` (visited-state trace), `state-machine-accepts-p` (acceptance), and `state-machine-event-path` (shortest driving event sequence between two states). |
 | State-machine builders | Done | Serialization (`to-plist`/`plist-to`), `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`/`remove-transition`, and `state-machine-relabel-state`. |
@@ -134,10 +135,11 @@ nix flake check
 - Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-weighted-distance`
 - Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-equal-p`, `graph-undirected-reachable-p`
 - Graph connectivity APIs: `graph-connected-p`, `graph-strongly-connected-p`, `graph-self-loop-nodes`, `graph-condensation`, `graph-distances-from`, `graph-eccentricity`, `graph-diameter`
+- Graph algebra APIs: `graph-union`, `graph-intersection`, `graph-difference`, `graph-filter-nodes`, `graph-map-nodes`
 - State-machine analysis APIs: `state-machine-states`, `state-machine-event-types`, `state-machine-reachable-states`, `state-machine-unreachable-states`, `state-machine-terminal-states`, `state-machine-deterministic-p`, `state-machine->dot`, `state-machine->mermaid`
 - State-machine execution APIs: `state-machine-run-states`, `state-machine-accepts-p`, `state-machine-event-path`
 - State-machine builder APIs: `state-machine-to-plist`, `plist-to-state-machine`, `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`, `remove-transition`, `state-machine-relabel-state`
-- Combinator APIs: `mapping-handler`, `compose-handlers`, `retrying-handler`, `fallback-handler`, `memoizing-handler`, `tapping-handler`, `wrap-node`, `node-with-retry`, `node-with-fallback`, `node-with-memoization`, `node-with-tap`
+- Combinator APIs: `mapping-handler`, `compose-handlers`, `retrying-handler`, `fallback-handler`, `memoizing-handler`, `tapping-handler`, `wrap-node`, `node-with-retry`, `node-with-fallback`, `node-with-memoization`, `node-with-tap`, `contract-handler`, `node-with-contract`
 - Stream APIs: `flow-stream-p`, `empty-stream`, `list->stream`, `stream-of`, `stream-range`, `stream-map`, `stream-filter`, `stream-scan`, `stream-take`, `stream-drop`, `stream-take-while`, `stream-drop-while`, `stream-distinct`, `stream-flat-map`, `stream-concat`, `stream-zip`, `stream-tap`, `stream-collect`, `stream-reduce`, `stream-for-each`, `stream-count`, `stream-first`, `stream-empty-p`
 - Stream generator/window/aggregate APIs: `stream-iterate`, `stream-repeat`, `stream-cycle`, `stream-enumerate`, `stream-unfold`, `stream-chunk`, `stream-window`, `stream-partition-by`, `stream-sum`, `stream-min`, `stream-max`, `stream-find`, `stream-some`, `stream-every`, `stream-last`, `stream-nth`
 - Stream op/collector APIs: `stream-zip-with`, `stream-interleave`, `stream-take-nth`, `stream-dedupe-consecutive`, `stream-interpose`, `stream-group-by`, `stream-frequencies`, `stream-index-by`, `stream-partition`, `stream-split-at`, `stream-average`

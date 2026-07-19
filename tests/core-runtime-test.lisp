@@ -136,7 +136,12 @@
     graph-condensation
     graph-distances-from
     graph-eccentricity
-    graph-diameter)
+    graph-diameter
+    graph-union
+    graph-intersection
+    graph-difference
+    graph-filter-nodes
+    graph-map-nodes)
   (:context
     context
     context-p
@@ -280,7 +285,9 @@
     node-with-retry
     node-with-fallback
     node-with-memoization
-    node-with-tap)
+    node-with-tap
+    contract-handler
+    node-with-contract)
   (:protocols
     flow-name
     flow-metadata

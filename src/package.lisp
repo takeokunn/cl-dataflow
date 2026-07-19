@@ -108,6 +108,11 @@
     #:graph-distances-from
     #:graph-eccentricity
     #:graph-diameter
+    #:graph-union
+    #:graph-intersection
+    #:graph-difference
+    #:graph-filter-nodes
+    #:graph-map-nodes
 
     #:context
     #:context-p
@@ -250,6 +255,8 @@
     #:node-with-fallback
     #:node-with-memoization
     #:node-with-tap
+    #:contract-handler
+    #:node-with-contract
 
     #:flow-name
     #:flow-metadata
