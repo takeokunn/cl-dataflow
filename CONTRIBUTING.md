@@ -34,3 +34,17 @@ If you add or change public behavior, update or add the narrowest test that prov
 - Summarize the user-visible change first.
 - Call out any compatibility impact.
 - Include the verification commands you ran.
+
+## Releasing
+
+Releases are tag-driven. To cut version `X.Y.Z`:
+
+1. Bump `:version` in both systems in `cl-dataflow.asd` and the `version` field in `flake.nix`.
+2. Move the `## [Unreleased]` entries in `CHANGELOG.md` under a new `## [X.Y.Z] - YYYY-MM-DD` heading, reset `## [Unreleased]`, and update the compare/link references at the bottom.
+3. Update the version badge in `README.md`.
+4. Merge the change, then tag the merge commit: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+Pushing the tag runs `.github/workflows/release.yml`, which verifies the tag
+matches `cl-dataflow.asd`, extracts the matching `CHANGELOG.md` section, and
+publishes a GitHub release. The tag must equal the `.asd` version or the release
+job fails by design.

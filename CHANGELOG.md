@@ -1,47 +1,53 @@
 # Changelog
 
-## Unreleased
+All notable changes to this project are documented in this file.
 
-- Bumped the pinned `cl-weave` flake input to its latest revision (a docs-only fix on top of v0.8.0); `cl-prolog` was already current at v0.6.0.
-- Fixed pipeline input binding for nodes with more than one incoming edge on the same port: resolution now deterministically prefers the most recently added edge instead of an insertion-order accident that silently favoured the oldest one.
-- Fixed `graph-source-nodes` and `graph-sink-nodes` to stay inspectable on a legally constructed cyclic graph instead of raising `graph-cycle-error`, matching the inspectability `graph-nodes`/`graph-edges` already guarantee; they no longer route through `topological-sort` internally, since source/sink membership only depends on indegree and successor counts.
-- Cut `run-pipeline` from O(V*E) to O(V+E) per run by building the incoming-edge index once per pipeline execution instead of rescanning the full edge list for every stage.
-- Cut `context-last-event`/`context-last-effect` from O(n) (copy, reverse, and re-copy the whole history) to O(1) by reading the most recent entry directly off the raw newest-first storage list.
-- Cut event/effect `trace-index` allocation from O(n) to O(1) per call by tracking a running trace-count slot instead of re-deriving it from `(length trace)` on every `emit-event`/`perform-effect`/state-machine transition; all trace-list mutation now goes through a single `%push-context-trace-entry` append point so the counter cannot drift from the list.
-- Added `graph-descendants` and `graph-ancestors` public readers that return every node reachable from (respectively, able to reach) a given node, as name-ordered node snapshots. They reuse the bulk-query adjacency traversal, so they are linear and terminate on cyclic graphs, and are cross-checked against a reference transitive closure in the property suite.
-- Added `graph-path`, which returns the node names of a shortest witnessing path between two nodes (or `NIL` when unreachable) via breadth-first search over the same adjacency, completing the reachability API family and property-checked for validity and agreement with `graph-reachable-p`.
-- Upgraded the pinned `cl-prolog` (0.6.0) and `cl-weave` (0.8.0) dependencies to their latest revisions.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+- No changes yet.
+
+## [0.1.0] - 2026-07-20
+
+First public release. `cl-dataflow` provides composable computation graphs,
+sequential and branching pipelines, event-driven workflows, guarded state
+machines, effect boundaries, and deterministic testing helpers behind a single
+public package.
+
+### Added
+
+- Public graph, node, edge, context, event, effect, state-machine, and pipeline primitives behind the single `cl-dataflow` package.
+- `graph-descendants` and `graph-ancestors` public readers that return every node reachable from (respectively, able to reach) a given node, as name-ordered node snapshots. They reuse the bulk-query adjacency traversal, so they are linear and terminate on cyclic graphs, and are cross-checked against a reference transitive closure in the property suite.
+- `graph-path`, which returns the node names of a shortest witnessing path between two nodes (or `NIL` when unreachable) via breadth-first search over the same adjacency, completing the reachability API family and property-checked for validity and agreement with `graph-reachable-p`.
+- Explicit `copy-context`, `copy-event`, `copy-effect`, and `copy-pipeline` helpers alongside the existing snapshot-safe APIs.
+- Structured error conditions with detail readers for graph lookups, cycles, effect-handler misses, invalid transitions, and guard failures (`node-not-found-designator`, `graph-cycle-nodes`, and the effect/state-machine detail readers).
+- Advanced cl-weave coverage: custom matchers (`:to-be-acyclic`, `:to-reach`), differential property tests that cross-check `graph-reachable-p` against a reference transitive closure over random DAGs, model-based/stateful tests that replay `gen-state-machine` traces through `run-state-machine` and compare against a reference transition model, determinism checks, guarded-selection tests, and `:to-run-under-ms` performance/anti-DoS guards for deep chains, exponential-path lattices (WIDTH^(LAYERS-1) distinct paths), and large directed cycles -- locking in that reachability stays linear and terminating on the shapes a naive recursive Prolog rule would blow up on.
+- A single `./scripts/verify.sh` entrypoint for tests and example smoke checks.
+- Runnable bootstrap-based examples for pipeline, event workflow, state machine, and graph-analysis flows.
+
+### Changed
+
 - Made the flake reference the architecture-independent `cl-prolog` source tree directly, so the dev shell, checks, and `nix run` work on every system now that upstream ships Linux-only per-system packages.
 - Rebuilt `topological-sort` to read the full edge relation with a single bulk `cl-prolog:query-prolog` call and drain a merge-ordered ready queue, cutting it from O(V*E) Prolog work plus a per-iteration re-sort down to linear adjacency construction with the same deterministic order.
 - Rebuilt `graph-reachable-p` to materialize the successor relation once and walk it with an explicit work list, so deep graphs no longer overflow the control stack and reachability issues one Prolog query instead of two per visited node.
 - Derived source/sink boundary nodes (`graph-source-nodes`, `graph-sink-nodes`) and pipeline sink-result collection from a single adjacency snapshot instead of a per-node Prolog query that rebuilt the whole rulebase each time, cutting pipeline result collection from O(V^2 + V*E) to linear.
 - Stopped the `graph-nodes` and `graph-edges` readers from running a full topological sort on every call: they now perform only cheap O(V+E) structural validation, so reads are no longer superlinear and a legally constructed cyclic graph stays inspectable and copyable.
+- Cut `run-pipeline` from O(V*E) to O(V+E) per run by building the incoming-edge index once per pipeline execution instead of rescanning the full edge list for every stage.
+- Cut `context-last-event`/`context-last-effect` from O(n) to O(1) by reading the most recent entry directly off the raw newest-first storage list.
+- Cut event/effect `trace-index` allocation from O(n) to O(1) per call by tracking a running trace-count slot instead of re-deriving it from `(length trace)` on every `emit-event`/`perform-effect`/state-machine transition; all trace-list mutation now goes through a single `%push-context-trace-entry` append point so the counter cannot drift from the list.
+- Made `add-node` reject duplicate node names and `add-edge` reject duplicate edge definitions instead of silently replacing or double-counting them.
+- Made `context-result`, `event-payload`, `event-metadata`, `effect-payload`, `effect-metadata`, `effect-result`, and `transition-metadata` return independent snapshots on read.
+- Made topological ordering deterministic for independent nodes so graph-backed execution and sink collection stay stable.
+- Made `%normalize-name` bind the printer control variables so non-symbol node/port designators normalize deterministically regardless of the caller's `*print-base*` and related bindings.
+
+### Fixed
+
+- Fixed pipeline input binding for nodes with more than one incoming edge on the same port: resolution now deterministically prefers the most recently added edge instead of an insertion-order accident that silently favoured the oldest one.
+- Fixed `graph-source-nodes` and `graph-sink-nodes` to stay inspectable on a legally constructed cyclic graph instead of raising `graph-cycle-error`, matching the inspectability `graph-nodes`/`graph-edges` already guarantee.
 - Fixed guarded state-machine transition selection: when several transitions share a `(state, event)` pair, a rejecting guard now falls through to the next candidate, and `guard-failed-error` is signalled only when every matching guard rejects. `state-machine-can-step-p` uses the same guard-aware selection.
 - Fixed `define-pipeline` and `define-workflow` to evaluate a `:metadata`/`:pipeline-metadata` form once instead of twice, and to gensym their internal `graph`, `edge`, and `machine` bindings so user handler/guard/action forms can no longer capture them.
-- Made `%normalize-name` bind the printer control variables so non-symbol node/port designators normalize deterministically regardless of the caller's `*print-base*` and related bindings.
-- Added advanced cl-weave coverage: custom matchers (`:to-be-acyclic`, `:to-reach`), differential property tests that cross-check `graph-reachable-p` against a reference transitive closure over random DAGs, model-based/stateful tests that replay `gen-state-machine` traces through `run-state-machine` and compare against a reference transition model, determinism checks, guarded-selection tests, and `:to-run-under-ms` performance/anti-DoS guards for deep chains, exponential-path lattices (WIDTH^(LAYERS-1) distinct paths), and large directed cycles -- locking in that reachability stays linear and terminating on the shapes a naive recursive Prolog rule would blow up on.
-- Added a single `./scripts/verify.sh` entrypoint for tests and example smoke checks.
-- Documented the verification script in the README and contributing guide.
-- Exported detail readers for effect and state-machine error conditions so callers can inspect failures directly.
-- Added a copied effect snapshot to `effect-handler-missing-error` for richer diagnostics.
-- Added `node-not-found-designator` so graph lookup failures expose the missing node name or edge reference.
-- Added `graph-cycle-nodes` so cycle detection exposes the remaining cyclic component.
-- Made `add-node` reject duplicate node names instead of silently replacing existing nodes.
-- Made `add-edge` reject duplicate edge definitions instead of counting them twice.
-- Added structured state-machine error readers for invalid transitions and guard failures.
-- Added explicit `copy-context`, `copy-event`, and `copy-effect` helpers alongside the existing snapshot-safe APIs.
-- Clarified that `copy-context` clones the effect-handler table so derived contexts can customize registrations safely.
-- Made `context-result` return an independent snapshot on read so pipeline results stay isolated from caller-side mutation.
-- Made `event-payload`, `event-metadata`, `effect-payload`, `effect-metadata`, `effect-result`, and `transition-metadata` return independent snapshots on read.
-- Documented that `state-machine-can-step-p` accepts `:context` for guarded-transition preflighting and that `run-state-machine-with-context` creates a seeded context when one is omitted.
-- Clarified that `make-state-machine-node` accepts event objects from `event-fn` in addition to event designators.
-- Documented the public pipeline contract for normalized structured node inputs and outputs.
-- Clarified that `pipeline-graph` is the live validated graph owned by a pipeline, and that `copy-pipeline` is the isolated-clone entry point.
-- Added explicit `copy-pipeline` support to clone pipeline graphs, stage order, and metadata together.
-- Ensured graph-backed pipelines remap stages onto the copied graph so cloned pipelines stay internally coherent.
-- Ensured `pipeline-graph` setter remaps existing stages onto the new copied graph.
-- Made topological ordering deterministic for independent nodes so graph-backed execution and sink collection stay stable.
-- Documented that `graph-source-nodes` and `graph-sink-nodes` return independent snapshots like the other collection readers.
-- Added snapshot-safe graph, context, pipeline, and state-machine APIs.
-- Added runnable bootstrap-based examples for pipeline, event workflow, and state machine flows.
-- Expanded test coverage for copy semantics, protocol introspection, and example execution.
+
+[Unreleased]: https://github.com/takeokunn/cl-dataflow/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/takeokunn/cl-dataflow/releases/tag/v0.1.0

@@ -1,5 +1,10 @@
 # cl-dataflow
 
+[![CI](https://github.com/takeokunn/cl-dataflow/actions/workflows/ci.yml/badge.svg)](https://github.com/takeokunn/cl-dataflow/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-brightgreen.svg)](CHANGELOG.md)
+[![SBCL](https://img.shields.io/badge/SBCL-supported-red.svg)](http://www.sbcl.org/)
+
 `cl-dataflow` is a small Common Lisp library for composable computation graphs, pipelines, event-driven workflows, state machines, and effect boundaries.
 
 ## Status
@@ -213,9 +218,13 @@ independent reference transitive closure over random DAGs, and a
 `:to-run-under-ms` performance guard that keeps deep-graph topological sort and
 reachability from regressing into superlinear behavior.
 
-GitHub Actions runs the CI workflow on `ubuntu-latest` only. Pull requests run
-the same `nix flake check` and coverage build as local verification, and the
-workflow uploads the generated coverage report as an artifact.
+GitHub Actions runs the CI workflow on a matrix of `ubuntu-latest`
+(`x86_64-linux`) and `macos-latest` (`aarch64-darwin`), so the documented
+cross-platform support is verified on every push and pull request. Each job runs
+the same `nix flake check` and coverage build as local verification and uploads
+the generated per-system coverage report as an artifact. Pushing a `vX.Y.Z` tag
+additionally triggers the release workflow, which publishes a GitHub release
+using the matching `CHANGELOG.md` section.
 
 ```bash
 nix run
