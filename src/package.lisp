@@ -114,6 +114,8 @@
     #:graph-difference
     #:graph-filter-nodes
     #:graph-map-nodes
+    #:graph-articulation-points
+    #:graph-bridges
 
     #:context
     #:context-p

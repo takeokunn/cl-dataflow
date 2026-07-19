@@ -142,7 +142,9 @@
     graph-intersection
     graph-difference
     graph-filter-nodes
-    graph-map-nodes)
+    graph-map-nodes
+    graph-articulation-points
+    graph-bridges)
   (:context
     context
     context-p
