@@ -234,3 +234,40 @@
           '(:capacity 3))
     (setf (edge-metadata (add-edge graph "a" "t")) '(:capacity 6))
     (is (= (graph-max-flow graph "s" "t") 6))))
+
+(deftest graph-min-cut-finds-the-bottleneck-edges
+  ;; s->a->b->t with a unit middle edge: the max-flow min-cut theorem places
+  ;; a and s on the source side (s->a still has slack) but leaves b and t on the
+  ;; sink side, so the single cut edge is a->b, matching the max flow of 1. This
+  ;; graph exercises every cut-scan case: an interior edge (s->a), the crossing
+  ;; edge (a->b), and a sink-side edge (b->t).
+  (let ((graph (%weighted-graph '("s" "a" "b" "t")
+                                '(("s" "a" 5) ("a" "b" 1) ("b" "t" 5)))))
+    (is (equal (graph-min-cut graph "s" "t" :capacity-key :weight) '(("a" "b"))))
+    (is (= (graph-max-flow graph "s" "t" :capacity-key :weight) 1))
+    ;; A node has no cut to itself.
+    (is (null (graph-min-cut graph "s" "s" :capacity-key :weight))))
+  ;; An unreachable sink leaves nothing crossing to the sink side.
+  (let ((graph (%weighted-graph '("s" "a" "t") '(("s" "a" 5)))))
+    (is (null (graph-min-cut graph "s" "t" :capacity-key :weight))))
+  ;; The default :capacity key with a supplied default: s->a saturates at
+  ;; capacity 1 while the capacity-less a->t rides the default of 5, so the cut
+  ;; is the saturated s->a edge.
+  (let ((graph (make-graph)))
+    (dolist (name '("s" "a" "t"))
+      (add-node graph (make-node name)))
+    (setf (edge-metadata (add-edge graph "s" "a")) '(:capacity 1))
+    (add-edge graph "a" "t")
+    (is (equal (graph-min-cut graph "s" "t" :default-capacity 5) '(("s" "a")))))
+  ;; On the CLRS network the cut capacity must equal the max flow of 23.
+  (let ((graph (%weighted-graph
+                '("s" "v1" "v2" "v3" "v4" "t")
+                '(("s" "v1" 16) ("s" "v2" 13) ("v1" "v2" 10) ("v2" "v1" 4)
+                  ("v1" "v3" 12) ("v3" "v2" 9) ("v2" "v4" 14) ("v4" "v3" 7)
+                  ("v3" "t" 20) ("v4" "t" 4)))))
+    (is (= (loop for (from to) in (graph-min-cut graph "s" "t" :capacity-key :weight)
+                 sum (loop for edge in (graph-edges graph)
+                           when (and (equal (edge-from edge) from)
+                                     (equal (edge-to edge) to))
+                           sum (getf (edge-metadata edge) :weight)))
+           23))))
