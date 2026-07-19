@@ -42,3 +42,29 @@
     (is (equal (graph-bridges graph) '(("a" "b") ("b" "d"))))
     ;; b is a cut vertex (it links d to the a<->b pair).
     (is (equal (graph-articulation-points graph) '("b")))))
+
+(deftest graph-dominators-builds-the-immediate-dominator-tree
+  ;; Diamond under a with a tail: a dominates b, c, and their merge d (both paths
+  ;; from a to d run through a), and d dominates e. Exercises a merge node with
+  ;; two processed predecessors (the intersect step) and a re-converging path.
+  (with-graph-fixture (graph
+                       ((r "r") (a "a") (b "b") (c "c") (d "d") (e "e"))
+                       :edges ((r a) (a b) (a c) (b d) (c d) (d e)))
+    (is (equal (graph-dominators graph "r")
+               '(("a" . "r") ("b" . "a") ("c" . "a") ("d" . "a") ("e" . "d")))))
+  ;; A back edge c -> a makes the graph cyclic: on the first pass a's predecessor
+  ;; c has no dominator yet (the skipped-predecessor case), and the fixpoint loop
+  ;; must run a second pass. a still dominates b, c, and d.
+  (with-graph-fixture (graph
+                       ((r "r") (a "a") (b "b") (c "c") (d "d"))
+                       :edges ((r a) (a b) (b c) (c a) (a d)))
+    (is (equal (graph-dominators graph "r")
+               '(("a" . "r") ("b" . "a") ("c" . "b") ("d" . "a")))))
+  ;; Nodes unreachable from the source have no dominator and are omitted.
+  (with-graph-fixture (graph
+                       ((r "r") (a "a") (island "island"))
+                       :edges ((r a)))
+    (is (equal (graph-dominators graph "r") '(("a" . "r")))))
+  ;; A lone source dominates nothing, so the map is empty.
+  (with-graph-fixture (graph ((r "r")))
+    (is (null (graph-dominators graph "r")))))

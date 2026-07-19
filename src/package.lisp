@@ -127,6 +127,7 @@
     #:graph-diff
     #:graph-articulation-points
     #:graph-bridges
+    #:graph-dominators
 
     #:context
     #:context-p

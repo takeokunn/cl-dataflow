@@ -33,7 +33,7 @@
 | Graph metrics | Done | Edge density, degree histogram, bipartiteness, structural `graph-equal-p`, and weak (undirected) reachability. |
 | Graph connectivity | Done | Weak/strong connectivity predicates, self-loop nodes, the SCC condensation DAG, single-source distances, eccentricity, and diameter. |
 | Graph algebra | Done | Set operations `graph-union`, `graph-intersection`, `graph-difference`, plus `graph-filter-nodes` (predicate-induced subgraph) and `graph-map-nodes` (injective relabel). |
-| Graph criticality | Done | `graph-articulation-points` (cut vertices / critical stages) and `graph-bridges` (critical connections / single points of failure), recursion-free. |
+| Graph criticality | Done | `graph-articulation-points` (cut vertices / critical stages), `graph-bridges` (critical connections / single points of failure), and `graph-dominators` (the immediate-dominator tree of mandatory waypoints), recursion-free. |
 | State-machine analysis | Done | State/event enumeration, reachability, unreachable/terminal-state detection, structural determinism check, and DOT/Mermaid rendering. |
 | State-machine execution | Done | `state-machine-run-states` (visited-state trace), `state-machine-accepts-p` (acceptance), and `state-machine-event-path` (shortest driving event sequence between two states). |
 | State-machine builders | Done | Serialization (`to-plist`/`plist-to`), `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`/`remove-transition`, and `state-machine-relabel-state`. |
@@ -149,7 +149,7 @@ nix flake check
 - Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-bipartite-p`, `graph-greedy-coloring`, `graph-equal-p`, `graph-undirected-reachable-p`
 - Graph connectivity APIs: `graph-connected-p`, `graph-strongly-connected-p`, `graph-self-loop-nodes`, `graph-condensation`, `graph-distances-from`, `graph-bfs-order`, `graph-dfs-order`, `graph-eccentricity`, `graph-diameter`, `graph-closeness-centrality`, `graph-betweenness-centrality`
 - Graph algebra APIs: `graph-union`, `graph-intersection`, `graph-difference`, `graph-diff`, `graph-filter-nodes`, `graph-map-nodes`
-- Graph criticality APIs: `graph-articulation-points`, `graph-bridges`
+- Graph criticality APIs: `graph-articulation-points`, `graph-bridges`, `graph-dominators`
 - State-machine analysis APIs: `state-machine-states`, `state-machine-event-types`, `state-machine-reachable-states`, `state-machine-unreachable-states`, `state-machine-terminal-states`, `state-machine-deterministic-p`, `state-machine->dot`, `state-machine->mermaid`
 - State-machine execution APIs: `state-machine-run-states`, `state-machine-accepts-p`, `state-machine-event-path`
 - State-machine builder APIs: `state-machine-to-plist`, `plist-to-state-machine`, `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`, `remove-transition`, `state-machine-relabel-state`, `state-machine->graph`

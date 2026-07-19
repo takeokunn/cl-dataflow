@@ -155,7 +155,8 @@
     graph-map-nodes
     graph-diff
     graph-articulation-points
-    graph-bridges)
+    graph-bridges
+    graph-dominators)
   (:context
     context
     context-p
