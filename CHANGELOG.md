@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- No changes yet.
+
+## [0.2.0] - 2026-07-20
+
 ### Added
 
 - Graph analysis API (`graph-algorithms.lisp`): `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components` (iterative Kosaraju), `graph-connected-components` (weakly connected), `graph-topological-generations` (parallelizable layers), and `graph-distance` (shortest hop count). Each builds the adjacency snapshot once and walks it with an explicit work list, so all stay linear and terminate on deep and cyclic graphs, matching the existing reachability API's guarantees.
@@ -95,5 +99,6 @@ public package.
 - Fixed guarded state-machine transition selection: when several transitions share a `(state, event)` pair, a rejecting guard now falls through to the next candidate, and `guard-failed-error` is signalled only when every matching guard rejects. `state-machine-can-step-p` uses the same guard-aware selection.
 - Fixed `define-pipeline` and `define-workflow` to evaluate a `:metadata`/`:pipeline-metadata` form once instead of twice, and to gensym their internal `graph`, `edge`, and `machine` bindings so user handler/guard/action forms can no longer capture them.
 
-[Unreleased]: https://github.com/takeokunn/cl-dataflow/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/takeokunn/cl-dataflow/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/takeokunn/cl-dataflow/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/takeokunn/cl-dataflow/releases/tag/v0.1.0
