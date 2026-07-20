@@ -40,6 +40,13 @@
       (is (equal (%names (graph-successors reduced "a")) '("b")))
       ;; Reachability is preserved.
       (is (graph-reachable-p reduced "a" "c"))))
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (a c) (a d) (b d) (c d)))
+    (let ((reduced (graph-transitive-reduction graph)))
+      (is (= (graph-size reduced) 4))
+      (is (equal (%names (graph-successors reduced "a")) '("b" "c")))
+      (is (graph-reachable-p reduced "a" "d"))))
   (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b) (b a)))
     (signals graph-cycle-error (graph-transitive-reduction graph))))
 
@@ -90,6 +97,20 @@
     (is (equal (graph-all-paths graph "a" "c") '(("a" "c")))))
   (with-graph-fixture (graph ((a "a")))
     (signals node-not-found-error (graph-all-paths graph "a" "missing"))))
+
+(deftest graph-reachability-helper-skips-duplicate-frontier-nodes
+  (let ((successors (make-hash-table :test #'equal)))
+    (setf (gethash "start" successors) '("a" "b")
+          (gethash "a" successors) '("shared")
+          (gethash "b" successors) '("shared")
+          (gethash "shared" successors) '("a"))
+    (is (not (cl-dataflow::%reachable-through-successors-p
+              successors "start" "missing"))))
+  (let ((successors (make-hash-table :test #'equal)))
+    (setf (gethash "start" successors) '("shared" "shared")
+          (gethash "shared" successors) '("start"))
+    (is (not (cl-dataflow::%reachable-through-successors-p
+              successors "start" "missing")))))
 
 (deftest graph-find-cycle-returns-a-cycle-or-nil
   (with-graph-fixture (graph

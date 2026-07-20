@@ -92,12 +92,55 @@ NEXT-SEED."
   (%positive-size n "STREAM-CHUNK")
   (%stream-chunk n stream))
 
+(defun %stream-window-fill (n stream)
+  (let ((window '())
+        (current stream)
+        (count 0))
+    (loop
+      (when (= count n) (return))
+      (let ((step (%stream-step current)))
+        (when (eq step :end) (return))
+        (push (car step) window)
+        (setf current (cdr step))
+        (incf count)))
+    (values (nreverse window) current count)))
+
+(defun %stream-window-state->list (front rear)
+  (if rear
+      (append front (reverse rear))
+      (copy-list front)))
+
+(defun %stream-window-advance (front rear value)
+  (let ((next-front (rest front))
+        (next-rear (cons value rear)))
+    (if next-front
+        (values next-front next-rear)
+        (values (reverse next-rear) '()))))
+
+(defun %stream-window-next (front rear rest-stream)
+  (%make-flow-stream
+   (lambda ()
+     (let ((step (%stream-step rest-stream)))
+       (if (eq step :end)
+           :end
+           (multiple-value-bind (next-front next-rear)
+               (%stream-window-advance front rear (car step))
+             (%stream-step
+              (%stream-window-from next-front next-rear (cdr step)))))))))
+
+(defun %stream-window-from (front rear rest-stream)
+  (%make-flow-stream
+   (lambda ()
+     (cons (%stream-window-state->list front rear)
+           (%stream-window-next front rear rest-stream)))))
+
 (defun %stream-window (n stream)
   (%make-flow-stream
    (lambda ()
-     (let ((window (stream-collect (stream-take n stream))))
-       (if (= (length window) n)
-           (cons window (%stream-window n (stream-drop 1 stream)))
+     (multiple-value-bind (window rest-stream count)
+         (%stream-window-fill n stream)
+       (if (= count n)
+           (%stream-step (%stream-window-from window '() rest-stream))
            :end)))))
 
 (defun stream-window (n stream)

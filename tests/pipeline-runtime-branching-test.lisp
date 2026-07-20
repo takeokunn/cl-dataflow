@@ -2,7 +2,6 @@
 
 (deftest branching-pipeline-collects-sink-results
   (with-branching-test-pipeline (graph pipeline source left right)
-    (declare (ignore graph source left right))
     (let ((context (run-pipeline-with-test-context pipeline :input 5)))
       (assert-pipeline-result context
                               '(("left" ("value" . 16))
@@ -10,7 +9,6 @@
 
 (deftest branching-pipeline-exposes-node-values-and-boundary-nodes
   (with-branching-test-pipeline (graph pipeline source left right)
-    (declare (ignore graph left right))
     (with-workflow-context (context pipeline :input 5)
       (is (equal (mapcar #'node-name (graph-source-nodes (pipeline-graph pipeline)))
                  '("source")))

@@ -34,6 +34,17 @@
     (is (= (graph-in-degree graph "s") 0))
     (is (null (graph-successors graph "t")))))
 
+(deftest graph-neighbors-deduplicate-parallel-edges
+  (with-graph-fixture (graph
+                       ((s "s" :outputs '("left" "right"))
+                        (a "a" :inputs '("left" "right")))
+                       :edges ((s a :from-port "left" :to-port "left")
+                               (s a :from-port "right" :to-port "right")))
+    (is (equal (%node-name-list (graph-successors graph "s")) '("a")))
+    (is (equal (%node-name-list (graph-predecessors graph "a")) '("s")))
+    (is (= (graph-out-degree graph "s") 1))
+    (is (= (graph-in-degree graph "a") 1))))
+
 (deftest graph-neighbors-reject-unknown-nodes
   (with-graph-fixture (graph ((a "a")))
     (signals node-not-found-error (graph-successors graph "missing"))

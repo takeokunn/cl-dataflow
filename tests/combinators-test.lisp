@@ -49,7 +49,7 @@
 
 (deftest retrying-handler-rejects-non-positive-attempts
   (signals invalid-input-error
-    (retrying-handler (lambda (i c) (declare (ignore i c)) i) :attempts 0)))
+    (retrying-handler (lambda (i c) (declare (ignore c)) i) :attempts 0)))
 
 (deftest fallback-handler-returns-value-on-error
   (let ((wrapped (fallback-handler (lambda (i c) (declare (ignore i c)) (error "x")) 42)))

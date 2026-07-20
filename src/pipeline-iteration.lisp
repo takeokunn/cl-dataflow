@@ -14,7 +14,6 @@ return (VALUES FINAL-RESULT CONTEXT). N = 0 returns (VALUES INPUT CONTEXT)."
   (let ((ctx (%ensure-pipeline-context context))
         (value input))
     (dotimes (iteration n (values value ctx))
-      (declare (ignore iteration))
       (setf value (run-pipeline pipeline :input value :context ctx)))))
 
 (defun run-pipeline-until-fixpoint (pipeline &key input context test max-iterations)

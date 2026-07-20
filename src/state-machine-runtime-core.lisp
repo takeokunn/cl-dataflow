@@ -81,7 +81,7 @@
           (slot-value machine 'transitions)))
 
 (defun %state-machine-transitions-list (machine)
-  (state-machine-transitions machine))
+  (slot-value machine 'transitions))
 
 (defun copy-state-machine (machine)
   (make-state-machine :state (state-machine-state machine)
@@ -120,6 +120,17 @@
   (let ((guard (transition-guard transition)))
     (or (null guard)
         (funcall guard machine event context))))
+
+(defun %find-transition-selection (machine event context event-type)
+  "Return selected transition and the first matching transition, if any."
+  (loop with first-match = nil
+        for transition in (%state-machine-transitions-list machine)
+        when (%transition-matches-p transition machine event-type)
+          do (when (%transition-guard-satisfied-p transition machine event context)
+               (return (values transition transition)))
+             (unless first-match
+               (setf first-match transition))
+        finally (return (values nil first-match))))
 
 (defun %select-transition (machine event context matches)
   "Return the first MATCH whose guard is absent or satisfied, else NIL.

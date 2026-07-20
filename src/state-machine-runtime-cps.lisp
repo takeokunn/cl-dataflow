@@ -8,20 +8,20 @@
           ,@initargs))
 
 (defun %resolve-transition/cps (machine event context event-type continuation)
-  (let ((matches (%matching-transitions machine event-type)))
-    (unless matches
+  (multiple-value-bind (transition first-match)
+      (%find-transition-selection machine event context event-type)
+    (unless first-match
       (%signal-state-machine-error invalid-transition-error
                                    machine
                                    event-type
                                    (%transition-error-detail machine event-type)))
-    (let ((transition (%select-transition machine event context matches)))
-      (unless transition
-        (%signal-state-machine-error guard-failed-error
-                                     machine
-                                     event-type
-                                     (%guard-error-detail machine event-type)
-                                     :transition (%copy-state-transition (first matches))))
-      (funcall continuation transition))))
+    (unless transition
+      (%signal-state-machine-error guard-failed-error
+                                   machine
+                                   event-type
+                                   (%guard-error-detail machine event-type)
+                                   :transition (%copy-state-transition first-match)))
+    (funcall continuation transition)))
 
 (defun %run-transition-action/cps (machine transition event context continuation)
   (let ((action (transition-action transition))

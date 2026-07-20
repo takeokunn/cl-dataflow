@@ -42,6 +42,13 @@ in chronological order."
     (mapcar (lambda (name) (gethash name nodes))
             (sort (%hash-table-keys nodes) #'string<))))
 
+(defun %flow-child-count (object)
+  (typecase object
+    (graph (hash-table-count (%graph-nodes-table object)))
+    (pipeline (length (%pipeline-stages-list object)))
+    (state-machine (length (%state-machine-transitions-list object)))
+    (t 0)))
+
 (defun flow-children (object)
   "Return the immediate sub-components of a flow OBJECT: a graph's nodes (name
 ordered), a pipeline's stages, or a state machine's transitions. Leaf objects
@@ -59,4 +66,4 @@ combining FLOW-KIND, FLOW-NAME, FLOW-METADATA, and FLOW-CHILDREN."
   (list :kind (flow-kind object)
         :name (flow-name object)
         :metadata (flow-metadata object)
-        :children (length (flow-children object))))
+        :children (%flow-child-count object)))

@@ -45,14 +45,28 @@ ports are counted individually, matching GRAPH-EDGES."
                  (%graph-nodes-table graph))
         adjacency)))
 
+(defun %graph-neighbor-name (edge name direction)
+  (ecase direction
+    (:successors (when (equal (edge-from edge) name) (edge-to edge)))
+    (:predecessors (when (equal (edge-to edge) name) (edge-from edge)))))
+
+(defun %graph-neighbor-names (graph name direction)
+  (let ((seen (make-hash-table :test #'equal))
+        (neighbors '()))
+    (dolist (edge (%graph-edges-list graph)
+             (sort neighbors #'string<))
+      (let ((neighbor (%graph-neighbor-name edge name direction)))
+        (when (and neighbor (not (gethash neighbor seen)))
+          (setf (gethash neighbor seen) t)
+          (push neighbor neighbors))))))
+
 (defun %graph-neighbor-nodes (graph node direction)
   (let ((name (%node-designator-name node)))
     (%ensure-graph-node graph name)
-    (let ((adjacency (%graph-adjacency-snapshot graph direction))
-          (nodes (%graph-nodes-table graph)))
+    (let ((nodes (%graph-nodes-table graph)))
       (mapcar (lambda (neighbor)
-                (%copy-node-snapshot (gethash neighbor nodes)))
-              (gethash name adjacency)))))
+                 (%copy-node-snapshot (gethash neighbor nodes)))
+              (%graph-neighbor-names graph name direction)))))
 
 (defun graph-successors (graph node)
   "Return copies of the immediate successor nodes of NODE (one edge away),
@@ -67,11 +81,15 @@ ordered by name."
 (defun graph-out-degree (graph node)
   "Return the number of distinct successor nodes of NODE. Distinct (from . to)
 pairs are counted once, matching the indegree convention in %GRAPH-ADJACENCY."
-  (length (graph-successors graph node)))
+  (let ((name (%node-designator-name node)))
+    (%ensure-graph-node graph name)
+    (length (%graph-neighbor-names graph name :successors))))
 
 (defun graph-in-degree (graph node)
   "Return the number of distinct predecessor nodes of NODE."
-  (length (graph-predecessors graph node)))
+  (let ((name (%node-designator-name node)))
+    (%ensure-graph-node graph name)
+    (length (%graph-neighbor-names graph name :predecessors))))
 
 (defun graph-transpose (graph)
   "Return a new graph with every edge reversed.
@@ -165,11 +183,14 @@ finish order. Both passes are iterative, so arbitrarily deep graphs are safe."
     (dolist (name (%graph-node-name-set graph))
       (let ((seen (make-hash-table :test #'equal))
             (neighbors '()))
-        (dolist (neighbor (append (gethash name successors)
-                                  (gethash name predecessors)))
-          (unless (gethash neighbor seen)
-            (setf (gethash neighbor seen) t)
-            (push neighbor neighbors)))
+        (flet ((record (neighbor)
+                 (unless (gethash neighbor seen)
+                   (setf (gethash neighbor seen) t)
+                   (push neighbor neighbors))))
+          (dolist (neighbor (gethash name successors))
+            (record neighbor))
+          (dolist (neighbor (gethash name predecessors))
+            (record neighbor)))
         (setf (gethash name adjacency) neighbors)))
     adjacency))
 

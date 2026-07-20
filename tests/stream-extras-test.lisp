@@ -38,9 +38,24 @@
 (deftest stream-window-slides-over-elements
   (is (equal (stream-collect (stream-window 2 (stream-of 1 2 3 4)))
              '((1 2) (2 3) (3 4))))
+  (let ((windows (stream-collect (stream-window 2 (stream-of 1 2 3)))))
+    (setf (car (first windows)) :changed)
+    (is (equal (second windows) '(2 3))))
   ;; A stream shorter than the window yields nothing.
   (is (null (stream-collect (stream-window 3 (stream-of 1 2)))))
   (signals invalid-input-error (stream-window 0 (stream-of 1))))
+
+(deftest stream-window-advances-without-restarting-source
+  (let ((forced 0))
+    (is (equal (stream-collect
+                (stream-take 3
+                  (stream-window 2
+                    (stream-tap (lambda (x)
+                                  (declare (ignore x))
+                                  (incf forced))
+                                (stream-range 0 10)))))
+               '((0 1) (1 2) (2 3))))
+    (is (= forced 4))))
 
 (deftest stream-partition-by-groups-consecutive-keys
   (is (equal (stream-collect (stream-partition-by #'evenp (stream-of 1 3 2 4 5)))

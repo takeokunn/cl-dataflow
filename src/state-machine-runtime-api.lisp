@@ -8,9 +8,11 @@
                            (%state-machine-transitions-list machine)))))
 
 (defun state-machine-can-step-p (machine event &key context)
-  (let* ((event-type (%event-type-designator event))
-         (matches (%matching-transitions machine event-type)))
-    (and (%select-transition machine event context matches) t)))
+  (let ((event-type (%event-type-designator event)))
+    (multiple-value-bind (transition first-match)
+        (%find-transition-selection machine event context event-type)
+      (declare (ignore first-match))
+      (and transition t))))
 
 (defun step-state-machine (machine event &key context)
   (let ((event-type (%event-type-designator event)))
