@@ -97,6 +97,7 @@
     #:graph-longest-path
     #:graph-all-paths
     #:graph-find-cycle
+    #:graph-eulerian-path
     #:graph-weighted-distance
     #:graph-weighted-path
     #:graph-weighted-distances-from
