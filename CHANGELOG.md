@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No changes yet.
 
+## [0.3.0] - 2026-07-20
+
+### Added
+
+- Resource-exhaustion guards across consumers: a `LIMIT` bound on the stream terminals (`stream-sum`, `stream-min`, `stream-max`, `stream-find`, `stream-some`, `stream-every`, `stream-last`, `stream-count-if`, `stream-variance`, `stream-stddev`, `stream-median`), `:limit`/`:on-limit` on `subject-collect`, and `:max-paths`/`:max-depth` on `graph-all-paths`, so an unbounded or adversarial source cannot exhaust memory.
+- Bounded state-machine transition history via `state-machine-history-limit`: the `:history-limit` option on `define-state-machine`/`make-state-machine` (preserved by `copy-state-machine`) trims and validates retained history so long-running machines stay memory-bounded.
+- Streaming renderers `write-state-machine-dot` and `write-state-machine-mermaid` that render to a stream; the string-returning `state-machine->dot`/`state-machine->mermaid` now wrap them.
+
+### Changed
+
+- Structured value copying (`%copy-structured-value`) is now circular-safe and deep-copies vectors and hash tables, so metadata accessors return fully independent snapshots and never hang on cyclic structure; `*print-circle*` is enabled so cyclic values print.
+- Untrusted names and values are escaped for control characters (`\n`, `\r`, `\t`, `\xNN;`) when rendered into error messages, `print-object` output, and DOT/Mermaid exports, preventing log/terminal injection.
+- Hot paths are faster with no behavior change: O(1) tail-pointer queues in flow and reachability search, early-exit reachability, memoized transitive reduction, O(1) subject subscribe/unsubscribe, incremental stream windows, single-pass state-machine transition selection, and Welford online variance.
+
+### Fixed
+
+- `state-machine-reachable-states` returns NIL for an unknown FROM state instead of treating it as reachable.
+- `state-machine-transition-for` returns an independent transition copy.
+- Weighted-graph and flow APIs reject negative edge weights and capacities instead of producing incorrect results.
+
 ## [0.2.0] - 2026-07-20
 
 ### Added
