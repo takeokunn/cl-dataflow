@@ -97,3 +97,50 @@ compared (see GRAPH-TO-PLIST)."
     (let ((component (find-if (lambda (names) (member from-name names :test #'equal))
                               (graph-connected-components graph))))
       (and (member to-name component :test #'equal) t))))
+
+(defun %undirected-neighbor-sets (graph)
+  "Name -> hash set of distinct undirected neighbours, excluding the node itself so
+self-loops never inflate a neighbourhood."
+  (let ((adjacency (%undirected-adjacency graph))
+        (result (%make-result-table)))
+    (maphash (lambda (name neighbors)
+               (let ((set (make-hash-table :test #'equal)))
+                 (dolist (neighbor neighbors)
+                   (unless (equal neighbor name)
+                     (setf (gethash neighbor set) t)))
+                 (setf (gethash name result) set)))
+             adjacency)
+    result))
+
+(defun graph-clustering-coefficient (graph node)
+  "Return the local clustering coefficient of NODE over GRAPH's undirected view: the
+fraction of the pairs of NODE's distinct neighbours that are themselves adjacent (how
+close the neighbourhood is to a clique). 0 when NODE has fewer than two neighbours.
+Edge direction and self-loops are ignored; parallel edges count once."
+  (let ((name (%node-designator-name node)))
+    (%ensure-graph-node graph name)
+    (let* ((sets (%undirected-neighbor-sets graph))
+           (neighbors (loop for neighbor being the hash-keys of (gethash name sets)
+                            collect neighbor))
+           (degree (length neighbors)))
+      (if (< degree 2)
+          0
+          (let ((links 0))
+            (loop for tail on neighbors
+                  for left = (car tail)
+                  do (dolist (right (cdr tail))
+                       (when (gethash right (gethash left sets))
+                         (incf links))))
+            (/ links (/ (* degree (1- degree)) 2)))))))
+
+(defun graph-average-clustering (graph)
+  "Return the average local clustering coefficient over every node of GRAPH -- the
+mean of GRAPH-CLUSTERING-COEFFICIENT, a global measure of how tightly neighbourhoods
+cluster. 0 for a graph with no nodes."
+  (let ((names (graph-node-names graph)))
+    (if names
+        (/ (reduce #'+ (mapcar (lambda (name)
+                                 (graph-clustering-coefficient graph name))
+                               names))
+           (length names))
+        0)))

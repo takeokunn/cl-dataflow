@@ -104,6 +104,8 @@
     #:graph-min-cut
     #:graph-density
     #:graph-degree-histogram
+    #:graph-clustering-coefficient
+    #:graph-average-clustering
     #:graph-bipartite-p
     #:graph-greedy-coloring
     #:graph-equal-p

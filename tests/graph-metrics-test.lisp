@@ -67,3 +67,31 @@
   ;; An isolated node takes colour 0.
   (with-graph-fixture (graph ((solo "solo")))
     (is (equal (graph-greedy-coloring graph) '(("solo" . 0))))))
+
+(deftest graph-clustering-coefficient-measures-neighbourhood-density
+  ;; In a triangle every node's two neighbours are adjacent, so each local
+  ;; coefficient -- and the average -- is 1.
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c) (c a)))
+    (is (= (graph-clustering-coefficient graph "a") 1))
+    (is (= (graph-average-clustering graph) 1)))
+  ;; In the path a -> b -> c, b's neighbours a and c are not adjacent (coefficient
+  ;; 0), and the endpoints have a single neighbour (the fewer-than-two case).
+  (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (b c)))
+    (is (= (graph-clustering-coefficient graph "b") 0))
+    (is (= (graph-clustering-coefficient graph "a") 0))
+    (is (= (graph-average-clustering graph) 0)))
+  ;; A square with one diagonal: the diagonal's endpoints see a fully-connected
+  ;; pair (coefficient 1), the off-diagonal corners only two of three pairs (2/3).
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c") (d "d"))
+                       :edges ((a b) (b c) (c d) (d a) (a c)))
+    (is (= (graph-clustering-coefficient graph "b") 1))
+    (is (= (graph-clustering-coefficient graph "a") 2/3))
+    (is (= (graph-average-clustering graph) 5/6)))
+  ;; A self-loop on a triangle node is ignored: its coefficient stays 1.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b c) (c a) (a a)))
+    (is (= (graph-clustering-coefficient graph "a") 1)))
+  ;; An empty graph has an average clustering of 0.
+  (is (= (graph-average-clustering (make-graph)) 0)))
