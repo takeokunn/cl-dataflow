@@ -39,4 +39,5 @@
                                :transitions ((ab "a" "go" "b") (bc "b" "go" "c")))
     (is (state-machine-reachable-p machine "a" "c"))
     (is (state-machine-reachable-p machine "a" "a"))
-    (is (not (state-machine-reachable-p machine "c" "a")))))
+    (is (not (state-machine-reachable-p machine "c" "a")))
+    (is (not (state-machine-reachable-p machine "missing" "missing")))))

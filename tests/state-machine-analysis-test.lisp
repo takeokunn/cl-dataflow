@@ -25,7 +25,8 @@
     (is (equal (state-machine-reachable-states machine)
                '("green" "off" "red" "yellow")))
     (is (equal (state-machine-reachable-states machine :from "red")
-               '("green" "off" "red" "yellow")))))
+               '("green" "off" "red" "yellow")))
+    (is (equal (state-machine-reachable-states machine :from "missing") '()))))
 
 (deftest state-machine-unreachable-states-are-detected
   (with-traffic-light (machine)

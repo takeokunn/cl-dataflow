@@ -25,14 +25,20 @@ per successful step plus the initial state. MACHINE itself is not modified."
   "Return true when consuming EVENTS from MACHINE steps successfully at every event
 and lands in a state named in ACCEPTING (compared case-insensitively). A failed
 transition anywhere yields NIL."
-  (let ((states (state-machine-run-states machine events :context context)))
-    (and (= (length states) (1+ (length events)))
-         (member (car (last states)) accepting :test #'string-equal)
+  (let ((current (copy-state-machine machine)))
+    (dolist (event events)
+      (handler-case
+          (setf current (step-state-machine current event :context context))
+        ((or invalid-transition-error guard-failed-error) ()
+          (return-from state-machine-accepts-p nil))))
+    (and (member (state-machine-state current) accepting :test #'string-equal)
          t)))
 
 (defun %state-machine-transition-index (machine)
   "State -> list of (EVENT-TYPE . TO-STATE) for every transition of MACHINE."
   (let ((index (%make-result-table)))
+    (dolist (state (state-machine-states machine))
+      (setf (gethash state index) '()))
     (dolist (transition (%state-machine-transitions-list machine) index)
       (push (cons (transition-event-type transition) (transition-to transition))
             (gethash (transition-from transition) index)))))
@@ -55,25 +61,29 @@ from FROM. FROM = TO returns an empty list. This is the event-level analog of
 GRAPH-PATH."
   (let ((start (%normalize-name from))
         (goal (%normalize-name to)))
-    (if (string= start goal)
-        '()
-        (let ((successors (%state-machine-transition-index machine))
-              (parent (make-hash-table :test #'equal))
-              (seen (make-hash-table :test #'equal))
-              (frontier nil))
-          (setf (gethash start seen) t
-                frontier (list start))
-          (loop
-            (unless frontier (return nil))
-            (let ((next '()))
-              (dolist (state frontier)
-                (dolist (edge (gethash state successors))
-                  (let ((event (car edge))
-                        (destination (cdr edge)))
-                    (unless (gethash destination seen)
-                      (setf (gethash destination seen) t
-                            (gethash destination parent) (cons state event))
-                      (push destination next)))))
-              (when (gethash goal parent)
-                (return (%reconstruct-event-path parent start goal)))
-              (setf frontier (nreverse next))))))))
+    (let ((successors (%state-machine-transition-index machine)))
+      (cond ((not (and (%state-machine-known-state-p start successors)
+                       (%state-machine-known-state-p goal successors)))
+             nil)
+            ((string= start goal)
+             '())
+            (t
+             (let ((parent (make-hash-table :test #'equal))
+                   (seen (make-hash-table :test #'equal))
+                   (frontier nil))
+               (setf (gethash start seen) t
+                     frontier (list start))
+               (loop
+                 (unless frontier (return nil))
+                 (let ((next '()))
+                   (dolist (state frontier)
+                     (dolist (edge (gethash state successors))
+                       (let ((event (car edge))
+                             (destination (cdr edge)))
+                         (unless (gethash destination seen)
+                           (setf (gethash destination seen) t
+                                 (gethash destination parent) (cons state event))
+                           (push destination next)))))
+                   (when (gethash goal parent)
+                     (return (%reconstruct-event-path parent start goal)))
+                   (setf frontier (nreverse next))))))))))

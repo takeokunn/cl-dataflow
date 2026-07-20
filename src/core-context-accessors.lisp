@@ -25,10 +25,10 @@
   (:mapcar-copy context-events context events %copy-event)
   (:mapcar-copy context-effects context effects %copy-effect)
   (:transform graph-metadata graph metadata
-              (copy-tree (slot-value graph 'metadata))
+              (%copy-structured-value (slot-value graph 'metadata))
               (%normalize-metadata value))
   (:transform context-metadata context metadata
-              (copy-tree (slot-value context 'metadata))
+              (%copy-structured-value (slot-value context 'metadata))
               (%normalize-metadata value)))
 
 (defun context-trace (context)

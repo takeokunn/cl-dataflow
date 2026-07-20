@@ -70,6 +70,56 @@
     (is (functionp (gethash "log" (context-effect-handlers context))))
     (is (equal (context-metadata context) '((:labels "alpha"))))))
 
+(defun %metadata-payload-value (metadata)
+  (second (aref (second (first metadata)) 0)))
+
+(defun %assert-nested-metadata-isolated (object reader writer)
+  (let ((input-vector (vector (list :value "original"))))
+    (funcall writer (list (list :payload input-vector)) object)
+    (setf (second (aref input-vector 0)) "input-mutated")
+    (is (string= (%metadata-payload-value (funcall reader object)) "original"))
+    (let ((snapshot (funcall reader object)))
+      (setf (second (aref (second (first snapshot)) 0)) "snapshot-mutated"))
+    (is (string= (%metadata-payload-value (funcall reader object)) "original"))))
+
+(deftest metadata-accessors-copy-nested-mutable-values
+  (let ((node (make-node "node"))
+        (edge (make-edge "node" "sink"))
+        (graph (make-graph))
+        (context (make-context))
+        (event (make-event "event"))
+        (effect (make-effect "effect"))
+        (transition (make-transition "idle" "go" "running"))
+        (machine (make-state-machine :state "idle"))
+        (pipeline (make-pipeline)))
+    (%assert-nested-metadata-isolated
+     node #'node-metadata (lambda (metadata object)
+                            (setf (node-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     edge #'edge-metadata (lambda (metadata object)
+                            (setf (edge-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     graph #'graph-metadata (lambda (metadata object)
+                              (setf (graph-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     context #'context-metadata (lambda (metadata object)
+                                  (setf (context-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     event #'event-metadata (lambda (metadata object)
+                              (setf (event-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     effect #'effect-metadata (lambda (metadata object)
+                                (setf (effect-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     transition #'transition-metadata (lambda (metadata object)
+                                        (setf (transition-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     machine #'state-machine-metadata (lambda (metadata object)
+                                        (setf (state-machine-metadata object) metadata)))
+    (%assert-nested-metadata-isolated
+     pipeline #'pipeline-metadata (lambda (metadata object)
+                                    (setf (pipeline-metadata object) metadata)))))
+
 (deftest public-predicate-helpers-recognize-core-types
   (let* ((node (make-node "source"))
          (edge (make-edge "source" "sink"))

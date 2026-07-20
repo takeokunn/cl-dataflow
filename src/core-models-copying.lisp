@@ -45,8 +45,8 @@
 
 (define-copy-instance %copy-node-error-snapshot (node node)
   (:name (%slot-value-or node 'name nil))
-  (:inputs (copy-tree (%slot-value-or node 'inputs nil)))
-  (:outputs (copy-tree (%slot-value-or node 'outputs nil)))
+  (:inputs (%copy-structured-value (%slot-value-or node 'inputs nil)))
+  (:outputs (%copy-structured-value (%slot-value-or node 'outputs nil)))
   (:handler (%slot-value-or node 'handler nil))
   (:metadata (%normalize-metadata (%slot-value-or node 'metadata nil))))
 

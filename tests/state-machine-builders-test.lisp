@@ -38,6 +38,16 @@
     ;; Right state, wrong event.
     (is (null (state-machine-transition-for machine "a" "pause")))))
 
+(deftest state-machine-transition-for-returns-independent-copy
+  (let* ((machine (make-state-machine
+                   :state "a"
+                   :transitions (list (make-transition "a" "go" "b"
+                                                       :metadata '((:label "original"))))))
+         (found (state-machine-transition-for machine "a" "go")))
+    (setf (transition-metadata found) '((:label "mutated")))
+    (is (equal (transition-metadata (state-machine-transition-for machine "a" "go"))
+               '((:label "original"))))))
+
 (deftest add-and-remove-transition-mutate-in-place
   (with-state-machine-fixture (machine
                                :state "a"

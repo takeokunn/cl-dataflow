@@ -45,23 +45,29 @@ every FROM/TO mentioned by a transition -- ordered lexicographically."
              table)
     table))
 
+(defun %state-machine-known-state-p (state table)
+  (nth-value 1 (gethash state table)))
+
 (defun state-machine-reachable-states
     (machine &key (from (state-machine-initial-state machine)))
   "Return the states reachable from FROM (default: the initial state) by following
-zero or more transitions, ordered lexicographically. FROM is always included."
+zero or more transitions, ordered lexicographically. Unknown FROM returns NIL."
   (let ((start (%normalize-name from))
         (successors (%state-machine-successor-table machine))
         (visited (make-hash-table :test #'equal))
         (stack '()))
-    (setf (gethash start visited) t)
-    (push start stack)
-    (loop while stack do
-      (let ((state (pop stack)))
-        (dolist (next (gethash state successors))
-          (unless (gethash next visited)
-            (setf (gethash next visited) t)
-            (push next stack)))))
-    (sort (%hash-table-keys visited) #'string<)))
+    (if (not (%state-machine-known-state-p start successors))
+        '()
+        (progn
+          (setf (gethash start visited) t)
+          (push start stack)
+          (loop while stack do
+            (let ((state (pop stack)))
+              (dolist (next (gethash state successors))
+                (unless (gethash next visited)
+                  (setf (gethash next visited) t)
+                  (push next stack)))))
+          (sort (%hash-table-keys visited) #'string<)))))
 
 (defun state-machine-unreachable-states (machine)
   "Return the states that cannot be reached from MACHINE's initial state, ordered

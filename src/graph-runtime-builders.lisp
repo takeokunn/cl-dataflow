@@ -27,7 +27,7 @@
         (%normalize-metadata metadata)))
 
 (defun pipeline-metadata (pipeline)
-  (copy-tree (slot-value pipeline 'metadata)))
+  (%copy-structured-value (slot-value pipeline 'metadata)))
 
 (defun %normalize-stage-spec (stage)
   (typecase stage
