@@ -144,3 +144,25 @@ cluster. 0 for a graph with no nodes."
                                names))
            (length names))
         0)))
+
+(defun graph-reciprocity (graph)
+  "Return the reciprocity of GRAPH: the fraction of its distinct directed edges
+(FROM -> TO with FROM /= TO) whose reverse edge TO -> FROM is also present. Parallel
+edges count once and self-loops are ignored. 0 when GRAPH has no non-loop edges."
+  (let ((pairs (make-hash-table :test #'equal)))
+    (dolist (edge (%graph-edges-list graph))
+      (let ((from (edge-from edge))
+            (to (edge-to edge)))
+        (unless (equal from to)
+          (setf (gethash (cons from to) pairs) t))))
+    (let ((total 0)
+          (mutual 0))
+      (maphash (lambda (pair present)
+                 (declare (ignore present))
+                 (incf total)
+                 (when (gethash (cons (cdr pair) (car pair)) pairs)
+                   (incf mutual)))
+               pairs)
+      (if (zerop total)
+          0
+          (/ mutual total)))))

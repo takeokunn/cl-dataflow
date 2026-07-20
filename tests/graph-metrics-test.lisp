@@ -95,3 +95,14 @@
     (is (= (graph-clustering-coefficient graph "a") 1)))
   ;; An empty graph has an average clustering of 0.
   (is (= (graph-average-clustering (make-graph)) 0)))
+
+(deftest graph-reciprocity-measures-mutual-edges
+  ;; a <-> b are mutual; a -> c has no reverse. Two of the three directed edges are
+  ;; reciprocated, and the self-loop a -> a is ignored, so reciprocity is 2/3.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b a) (a c) (a a)))
+    (is (= (graph-reciprocity graph) 2/3)))
+  ;; A graph whose only edge is a self-loop has no non-loop edges: reciprocity 0.
+  (with-graph-fixture (graph ((a "a")) :edges ((a a)))
+    (is (= (graph-reciprocity graph) 0))))

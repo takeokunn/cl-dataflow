@@ -135,6 +135,7 @@
     graph-degree-histogram
     graph-clustering-coefficient
     graph-average-clustering
+    graph-reciprocity
     graph-bipartite-p
     graph-greedy-coloring
     graph-equal-p
@@ -151,6 +152,8 @@
     graph-radius
     graph-center
     graph-periphery
+    graph-wiener-index
+    graph-average-path-length
     graph-closeness-centrality
     graph-betweenness-centrality
     graph-union

@@ -221,3 +221,31 @@ shortest paths stretch the whole diameter. Empty for a graph with no nodes."
     (loop for name in (graph-node-names graph)
           when (= (graph-eccentricity graph name) diameter)
           collect name)))
+
+(defun %graph-distance-totals (graph)
+  "Return (values SUM COUNT) over the shortest-path hop distances of every ordered
+pair of distinct nodes whose target is reachable from its source. Self-returns
+through cycles are excluded so a node is never paired with itself."
+  (let ((sum 0)
+        (count 0))
+    (dolist (name (graph-node-names graph))
+      (dolist (entry (graph-distances-from graph name))
+        (unless (equal (car entry) name)
+          (incf sum (cdr entry))
+          (incf count))))
+    (values sum count)))
+
+(defun graph-wiener-index (graph)
+  "Return the Wiener index of GRAPH: the sum of shortest-path hop distances over
+every ordered pair of distinct nodes for which the target is reachable from the
+source. Unreachable pairs contribute nothing. 0 for a graph with no edges."
+  (values (%graph-distance-totals graph)))
+
+(defun graph-average-path-length (graph)
+  "Return the average shortest-path length of GRAPH: its Wiener index divided by the
+number of reachable ordered pairs of distinct nodes. 0 when no node reaches another
+(no such pairs), so it never divides by zero."
+  (multiple-value-bind (sum count) (%graph-distance-totals graph)
+    (if (zerop count)
+        0
+        (/ sum count))))

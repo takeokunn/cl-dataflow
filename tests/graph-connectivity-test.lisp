@@ -117,3 +117,22 @@
   (with-graph-fixture (graph ((a "a") (b "b") (c "c")) :edges ((a b) (a c) (b c)))
     (is (equal (graph-betweenness-centrality graph)
                '(("a" . 0) ("b" . 0) ("c" . 0))))))
+
+(deftest graph-wiener-index-and-average-path-length
+  ;; Path a -> b -> c: distances are a->b 1, a->c 2, b->c 1, summing to 4 over 3
+  ;; reachable pairs, so the average path length is 4/3.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b") (c "c"))
+                       :edges ((a b) (b c)))
+    (is (= (graph-wiener-index graph) 4))
+    (is (= (graph-average-path-length graph) 4/3)))
+  ;; A 2-cycle a <-> b: each reaches the other in one hop; the cycle's return to
+  ;; the source is not counted as a pair, so the index is 2 and the average 1.
+  (with-graph-fixture (graph
+                       ((a "a") (b "b"))
+                       :edges ((a b) (b a)))
+    (is (= (graph-wiener-index graph) 2))
+    (is (= (graph-average-path-length graph) 1)))
+  ;; With no reachable pairs both are 0 (and the average never divides by zero).
+  (is (= (graph-wiener-index (make-graph)) 0))
+  (is (= (graph-average-path-length (make-graph)) 0)))
