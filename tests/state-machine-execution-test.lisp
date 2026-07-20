@@ -42,6 +42,8 @@
                '("reject")))
     ;; Same state needs no events.
     (is (equal (state-machine-event-path machine "draft" "draft") '()))
+    (is (null (state-machine-event-path machine "missing" "missing")))
+    (is (null (state-machine-event-path machine "draft" "missing")))
     ;; approved is terminal, so nothing leads out of it.
     (is (null (state-machine-event-path machine "approved" "draft")))))
 

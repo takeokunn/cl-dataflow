@@ -39,19 +39,19 @@
   (:setter-transform edge-to-port edge to-port (lambda (value)
                                                   (%normalize-name (or value "value"))))
   (:transform event-metadata event metadata
-              (copy-tree (%read-slot event 'metadata))
+              (%copy-structured-value (%read-slot event 'metadata))
               (%normalize-metadata value))
   (:transform effect-metadata effect metadata
-              (copy-tree (%read-slot effect 'metadata))
+              (%copy-structured-value (%read-slot effect 'metadata))
               (%normalize-metadata value))
   (:transform transition-metadata transition metadata
-              (copy-tree (slot-value transition 'metadata))
+              (%copy-structured-value (slot-value transition 'metadata))
               (%normalize-metadata value))
   (:transform state-machine-history machine history
               (copy-tree (slot-value machine 'history))
               (%copy-transition-history value))
   (:transform state-machine-metadata machine metadata
-              (copy-tree (slot-value machine 'metadata))
+              (%copy-structured-value (slot-value machine 'metadata))
               (%normalize-metadata value))
   (:transform node-inputs node inputs
               (%normalize-unique-port-list (slot-value node 'inputs) "input")
@@ -60,8 +60,8 @@
               (%normalize-unique-port-list (slot-value node 'outputs) "output")
               (%normalize-unique-port-list value "output"))
   (:transform node-metadata node metadata
-              (copy-tree (slot-value node 'metadata))
+              (%copy-structured-value (slot-value node 'metadata))
               (%normalize-metadata value))
   (:transform edge-metadata edge metadata
-              (copy-tree (slot-value edge 'metadata))
+              (%copy-structured-value (slot-value edge 'metadata))
               (%normalize-metadata value)))

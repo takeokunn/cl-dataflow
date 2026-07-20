@@ -57,10 +57,12 @@ with no events is vacuously complete."
 or NIL when none matches. The result is an independent copy."
   (let ((normalized-state (%normalize-name state))
         (normalized-event (%normalize-name event-type)))
-    (find-if (lambda (transition)
-               (and (string-equal (transition-from transition) normalized-state)
-                    (string-equal (transition-event-type transition) normalized-event)))
-             (%state-machine-transitions-list machine))))
+    (let ((transition (find-if (lambda (transition)
+                                 (and (string-equal (transition-from transition) normalized-state)
+                                      (string-equal (transition-event-type transition) normalized-event)))
+                               (%state-machine-transitions-list machine))))
+      (when transition
+        (%copy-state-transition transition)))))
 
 (defun add-transition (machine from event-type to &key guard action metadata)
   "Append a transition FROM --EVENT-TYPE--> TO to MACHINE, in place, and return

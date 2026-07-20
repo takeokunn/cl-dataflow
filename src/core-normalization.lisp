@@ -12,7 +12,7 @@
              (*print-radix* nil)
              (*print-readably* nil)
              (*print-pretty* nil)
-             (*print-circle* nil)
+             (*print-circle* t)
              (*print-case* :upcase))
          (princ-to-string value)))))
 
@@ -37,7 +37,7 @@
       (setf (gethash port seen) t))))
 
 (defun %normalize-metadata (metadata)
-  (if metadata (copy-tree metadata) '()))
+  (if metadata (%copy-structured-value metadata) '()))
 
 (defun %plist-value (plist key &optional default)
   (let ((position (position key plist :test #'equal)))

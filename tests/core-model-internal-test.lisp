@@ -120,6 +120,9 @@
       (is (= (gethash "value" table) 10)))
     (is (equal (cl-dataflow::%normalize-name :state) "STATE"))
     (is (equal (cl-dataflow::%normalize-name 42) "42"))
+    (let ((circular (list "loop")))
+      (setf (cdr circular) circular)
+      (is (search "#1=" (cl-dataflow::%normalize-name circular))))
     (is (equal (cl-dataflow::%normalize-port-list :value) '("VALUE")))
     (is (= (cl-dataflow::%plist-value '("value" 1 "other" 2) "other") 2))
     (is (null (cl-dataflow::%plist-value '("value" 1) "missing")))
@@ -135,6 +138,25 @@
                '(("value" . 7))))
     (is (equal (cl-dataflow::%hash-table-keys table)
                '("value" "other")))))
+
+(deftest internal-copy-structured-value-preserves-circular-structures
+  (let ((value (list "loop")))
+    (setf (cdr value) value)
+    (let ((copy (cl-dataflow::%copy-structured-value value)))
+      (is (not (eq copy value)))
+      (is (not (eq (car copy) (car value))))
+      (is (equal (car copy) "loop"))
+      (is (eq (cdr copy) copy))))
+  (let ((value (make-array 1)))
+    (setf (aref value 0) value)
+    (let ((copy (cl-dataflow::%copy-structured-value value)))
+      (is (not (eq copy value)))
+      (is (eq (aref copy 0) copy))))
+  (let ((table (make-hash-table :test #'equal)))
+    (setf (gethash "self" table) table)
+    (let ((copy (cl-dataflow::%copy-structured-value table)))
+      (is (not (eq copy table)))
+      (is (eq (gethash "self" copy) copy)))))
 
 (deftest internal-error-copy-helpers-copy-nested-model-structures
   (let* ((node (make-node "source"
