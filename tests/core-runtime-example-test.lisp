@@ -121,4 +121,40 @@ assertions. Prefers a system SBCL, then falls back to `nix run nixpkgs#sbcl`."
    "examples/graph-analysis.lisp"
    "Downstream of parse"
    "Shortest path ingest -> load"
-   "Sources: (\"ingest\")"))
+   "Sources: (\"ingest\")")
+  (example-graph-toolkit-script-runs
+   "examples/graph-toolkit.lisp"
+   "Order: 4  Size: 4"
+   "Distance a -> d: 2"
+   "Strongly connected components: ((\"x\" \"y\" \"z\"))"
+   "digraph deps {")
+  (example-state-machine-visualization-script-runs
+   "examples/state-machine-visualization.lisp"
+   "Unreachable states: (\"archived\")"
+   "Terminal states: (\"cancelled\" \"shipped\")"
+   "stateDiagram-v2")
+  (example-resilient-pipeline-script-runs
+   "examples/resilient-pipeline.lisp"
+   "Retry result: 70 (after 3 attempts)"
+   "Fallback on odd 3: -1"
+   "Sequenced (double then increment) of 20: 41")
+  (example-streams-script-runs
+   "examples/streams.lisp"
+   "First 3 even squares: (4 16 36)"
+   "Running totals: (0 1 3 6 10)"
+   "Sum of distinct values: 10")
+  (example-graph-analysis-advanced-script-runs
+   "examples/graph-analysis-advanced.lisp"
+   "Critical path: (\"fetch\" \"compile\" \"lint\" \"package\")"
+   "Edges after transitive reduction: 5 (was 6)"
+   "Round-trips to an equal graph? T")
+  (example-stream-analytics-script-runs
+   "examples/stream-analytics.lisp"
+   "Frequencies: ((:CLICK . 3) (:VIEW . 3) (:PURCHASE . 1))"
+   "Window averages: (2 3 4 5)"
+   "Mean of 1..100: 101/2")
+  (example-integration-script-runs
+   "examples/integration.lisp"
+   "Priced orders: (30 70 120)"
+   "High-value alerts (> 50): (70 120)"
+   "Context round-trips through a plist: T"))

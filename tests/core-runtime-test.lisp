@@ -29,7 +29,8 @@
     :macros
     (define-state-machine
       define-pipeline
-      define-workflow))
+      define-workflow
+      with-effect-handler-scope))
   (:errors
     cl-dataflow-error
     invalid-input-error
@@ -93,6 +94,79 @@
     graph-path
     validate-graph
     topological-sort)
+  (:graph-algorithms
+    graph-node-names
+    graph-order
+    graph-size
+    graph-empty-p
+    graph-successors
+    graph-predecessors
+    graph-out-degree
+    graph-in-degree
+    graph-transpose
+    graph-acyclic-p
+    graph-strongly-connected-components
+    graph-connected-components
+    graph-topological-generations
+    graph-distance
+    graph->dot
+    graph->mermaid
+    graph-layout
+    graph-to-plist
+    plist-to-graph
+    remove-node
+    remove-edge
+    graph-subgraph
+    graph-merge
+    graph-relabel-node
+    graph-contract-edge
+    graph-transitive-closure
+    graph-transitive-reduction
+    graph-topological-rank
+    graph-longest-path
+    graph-all-paths
+    graph-find-cycle
+    graph-eulerian-path
+    graph-weighted-distance
+    graph-weighted-path
+    graph-weighted-distances-from
+    graph-max-flow
+    graph-min-cut
+    graph-density
+    graph-degree-histogram
+    graph-clustering-coefficient
+    graph-average-clustering
+    graph-reciprocity
+    graph-bipartite-p
+    graph-greedy-coloring
+    graph-equal-p
+    graph-undirected-reachable-p
+    graph-connected-p
+    graph-strongly-connected-p
+    graph-self-loop-nodes
+    graph-condensation
+    graph-distances-from
+    graph-bfs-order
+    graph-dfs-order
+    graph-eccentricity
+    graph-diameter
+    graph-radius
+    graph-center
+    graph-periphery
+    graph-wiener-index
+    graph-average-path-length
+    graph-closeness-centrality
+    graph-betweenness-centrality
+    graph-union
+    graph-intersection
+    graph-difference
+    graph-filter-nodes
+    graph-map-nodes
+    graph-diff
+    graph-articulation-points
+    graph-bridges
+    graph-dominators
+    graph-post-dominators)
   (:context
     context
     context-p
@@ -116,7 +190,15 @@
     context-result
     context-state
     make-context
-    copy-context)
+    copy-context
+    context-summary
+    format-trace
+    trace-summary
+    context-merge
+    context-trace-of-kind
+    context-to-plist
+    plist-to-context
+    context-equal-p)
   (:event
     event
     event-p
@@ -126,7 +208,11 @@
     event-trace-index
     make-event
     emit-event
-    copy-event)
+    copy-event
+    emit-events
+    event-of-type-p
+    event-to-plist
+    plist-to-event)
   (:effect
     effect
     effect-p
@@ -137,7 +223,18 @@
     effect-result
     make-effect
     perform-effect
-    copy-effect)
+    copy-effect
+    register-effect-handler
+    context-effect-handler
+    effect-handled-p
+    context-effect-handler-types
+    with-effect-handler-scope
+    perform-effects
+    context-effect-results
+    context-effect-results-of-type
+    effect-of-type-p
+    effect-to-plist
+    plist-to-effect)
   (:state-machine
     state-transition
     state-transition-p
@@ -165,7 +262,28 @@
     step-state-machine
     run-state-machine
     run-state-machine-with-context
-    make-state-machine-node)
+    make-state-machine-node
+    state-machine-states
+    state-machine-event-types
+    state-machine-reachable-states
+    state-machine-unreachable-states
+    state-machine-terminal-states
+    state-machine-deterministic-p
+    state-machine->dot
+    state-machine->mermaid
+    state-machine-run-states
+    state-machine-accepts-p
+    state-machine-event-path
+    state-machine-to-plist
+    plist-to-state-machine
+    state-machine-complete-p
+    state-machine-transition-for
+    add-transition
+    remove-transition
+    state-machine-relabel-state
+    state-machine->graph
+    state-machine-equal-p
+    state-machine-reachable-p)
   (:pipeline
     pipeline
     pipeline-p
@@ -177,11 +295,130 @@
     define-workflow
     copy-pipeline
     run-pipeline
-    run-pipeline-with-context)
+    run-pipeline-with-context
+    run-pipeline-sequence
+    pipeline->dot
+    pipeline->mermaid
+    pipeline-node-names
+    pipeline-stage-names
+    pipeline-source-names
+    pipeline-sink-names
+    pipeline-to-plist
+    plist-to-pipeline
+    pipeline-validate
+    pipeline-stage-count
+    map-pipeline
+    pipeline->node
+    pipeline-equal-p
+    run-pipeline-times
+    run-pipeline-until-fixpoint
+    run-pipeline-while)
+  (:combinators
+    mapping-handler
+    compose-handlers
+    retrying-handler
+    fallback-handler
+    memoizing-handler
+    tapping-handler
+    wrap-node
+    node-with-retry
+    node-with-fallback
+    node-with-memoization
+    node-with-tap
+    contract-handler
+    node-with-contract)
   (:protocols
     flow-name
     flow-metadata
-    flow-kind)
+    flow-kind
+    flow-describe
+    flow-children)
+  (:reactive
+    make-subject
+    subject-p
+    subject-subscribe
+    subject-unsubscribe
+    subject-emit
+    subject-subscriber-count
+    subject-map
+    subject-filter
+    subject-merge
+    subject-collect
+    subject-scan
+    subject-distinct
+    subject-tap
+    subject-take
+    subject-zip
+    subject-combine-latest
+    subject-buffer
+    subject-drop
+    subject-take-while
+    subject-drop-while
+    subject-count
+    subject-flat-map
+    subject-partition)
+  (:streams
+    flow-stream-p
+    empty-stream
+    list->stream
+    stream-of
+    stream-range
+    stream-map
+    stream-filter
+    stream-scan
+    stream-take
+    stream-drop
+    stream-take-while
+    stream-drop-while
+    stream-distinct
+    stream-flat-map
+    stream-concat
+    stream-zip
+    stream-tap
+    stream-collect
+    stream-reduce
+    stream-for-each
+    stream-count
+    stream-first
+    stream-empty-p
+    stream-iterate
+    stream-repeat
+    stream-cycle
+    stream-enumerate
+    stream-unfold
+    stream-chunk
+    stream-window
+    stream-partition-by
+    stream-sum
+    stream-min
+    stream-max
+    stream-find
+    stream-some
+    stream-every
+    stream-last
+    stream-nth
+    stream-zip-with
+    stream-interleave
+    stream-take-nth
+    stream-dedupe-consecutive
+    stream-interpose
+    stream-group-by
+    stream-frequencies
+    stream-index-by
+    stream-partition
+    stream-split-at
+    stream-average
+    stream-distinct-by
+    stream-flatten
+    stream-scan1
+    stream-count-if
+    stream-variance
+    stream-stddev
+    stream-median
+    stream-find-index
+    stream-none-p
+    stream-mode
+    stream-cartesian)
   (:testing
     run-pipeline-with-test-context
     assert-emitted-events

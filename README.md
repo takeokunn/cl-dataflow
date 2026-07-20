@@ -20,13 +20,37 @@
 | --- | --- | --- |
 | Graphs and nodes | Done | Node creation, edge construction, graph validation, and topological sort are implemented. |
 | Pipelines | Done | Sequential pipelines and simple branching pipelines run against graph-ordered stages. |
+| Iterative pipelines | Done | Feedback execution: `run-pipeline-times`, `run-pipeline-until-fixpoint`, and `run-pipeline-while` feed a result back as the next input for recurrent/settling computations. |
 | Events | Done | Event creation, emission, and trace capture are implemented. |
 | Effects | Done | Effect creation, handler lookup, and test-friendly execution are implemented. |
 | State machines | Done | States, transitions, guards, history, reset/copy helpers, step-based execution, context propagation, and pipeline-stage embedding are implemented. |
 | Event workflows | Done | Pipeline stages can emit events, run effects, and advance a state machine in one workflow. |
+| Graph algorithms | Done | Strongly/weakly connected components, topological generations, transpose, acyclicity, shortest-hop distance, degrees, and immediate neighbors, all over the bulk-query adjacency snapshot. |
+| Graph export | Done | Deterministic Graphviz DOT and Mermaid rendering, plus a `graph-to-plist`/`plist-to-graph` structural round trip. |
+| Graph mutation | Done | `remove-node`, `remove-edge`, induced `graph-subgraph`, disjoint `graph-merge`, and `graph-relabel-node` for editing and composing graphs. |
+| Graph paths | Done | Transitive closure/reduction, topological rank, longest (critical) path, all simple paths, an ordered cycle witness, and weighted (Dijkstra) shortest distance and path. |
+| Equality predicates | Done | `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p` (structural equality via plist serialization), and `state-machine-reachable-p`. |
+| Graph metrics | Done | Edge density, degree histogram, bipartiteness, structural `graph-equal-p`, and weak (undirected) reachability. |
+| Graph connectivity | Done | Weak/strong connectivity predicates, self-loop nodes, the SCC condensation DAG, single-source distances, eccentricity, and diameter. |
+| Graph algebra | Done | Set operations `graph-union`, `graph-intersection`, `graph-difference`, plus `graph-filter-nodes` (predicate-induced subgraph) and `graph-map-nodes` (injective relabel). |
+| Graph criticality | Done | `graph-articulation-points` (cut vertices / critical stages), `graph-bridges` (critical connections / single points of failure), `graph-dominators` (the immediate-dominator tree of mandatory waypoints), and `graph-post-dominators` (its dual toward a sink), recursion-free. |
+| State-machine analysis | Done | State/event enumeration, reachability, unreachable/terminal-state detection, structural determinism check, and DOT/Mermaid rendering. |
+| State-machine execution | Done | `state-machine-run-states` (visited-state trace), `state-machine-accepts-p` (acceptance), and `state-machine-event-path` (shortest driving event sequence between two states). |
+| State-machine builders | Done | Serialization (`to-plist`/`plist-to`), `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`/`remove-transition`, and `state-machine-relabel-state`. |
+| Combinators | Done | Handler wrappers (retry, fallback, memoize, tap, map, compose), node wrappers, and result-threading pipeline sequencing. |
+| Streams (pull) | Done | A lazy transducer layer (`map`/`filter`/`scan`/`take`/`drop`/`distinct`/`flat-map`/`concat`/`zip`/`tap`) with `collect`/`reduce`/`for-each`/`count`/`first` consumers. |
+| Reactive subjects (push) | Done | Synchronous push-based subjects with `subscribe`/`emit`/`unsubscribe` and derived `subject-map`/`subject-filter`/`subject-merge` -- the producer-driven dual of pull streams for event-driven workflows. |
+| Reactive operators | Done | Stateful/combining subject operators `scan`, `distinct`, `tap`, `take`, `drop`, `take-while`, `drop-while`, `count`, `zip`, `combine-latest`, `buffer` -- push-side parity with the pull-stream vocabulary. |
+| Stream extras | Done | Generators (`iterate`/`repeat`/`cycle`/`enumerate`/`unfold`), windowing (`chunk`/`window`/`partition-by`), and aggregate consumers (`sum`/`min`/`max`/`find`/`some`/`every`/`last`/`nth`). |
+| Stream ops | Done | `zip-with`, `interleave`, `take-nth`, `dedupe-consecutive`, `interpose`, plus collectors `group-by`, `frequencies`, `index-by`, `partition`, `split-at`, `average`. |
+| Stream statistics | Done | `flatten`, `scan1`, `count-if`, and statistical aggregates `variance`, `stddev`, `median`. |
+| Stream search | Done | `find-index`, `none-p`, `mode`, and the lazy Cartesian product `stream-cartesian`. |
+| Context serialization | Done | `context-to-plist`/`plist-to-context` plus event/effect plist round trips, completing the serialization story (handlers excluded). |
+| Observability | Done | Pipeline rendering (`pipeline->dot`/`->mermaid`) and role enumeration, plus `format-trace`, `trace-summary`, and `context-summary` over a run's recorded trace. |
+| Effect ergonomics | Done | `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, and the `with-effect-handler-scope` macro for scoped handler registration. |
 | Protocols | Done | `flow-name`, `flow-metadata`, and `flow-kind` provide consistent introspection across flow objects. |
 | Testing helpers | Done | Dedicated helpers assert emitted events, effects, final state, state-machine state, and pipeline results. |
-| Runnable examples | Done | Minimal scripts cover a simple pipeline, an event workflow, and a state machine. |
+| Runnable examples | Done | Scripts cover a simple pipeline, event workflow, state machine, graph analysis, the graph toolkit, state-machine visualization, resilient pipelines, and streams. |
 | Public API | Stable | `cl-dataflow` is the single exported package. |
 
 ## Install
@@ -106,7 +130,34 @@ nix flake check
 - Event APIs: `make-event`, `copy-event`, `emit-event`, `event-type`, `event-payload`, `event-metadata`, `event-trace-index`
 - Effect APIs: `make-effect`, `copy-effect`, `perform-effect`, `effect-type`, `effect-payload`, `effect-metadata`, `effect-trace-index`, `effect-result`
 - State machine APIs: `make-transition`, `define-state-machine`, `step-state-machine`, `run-state-machine`, `run-state-machine-with-context`, `make-state-machine-node`, `make-state-machine`, `copy-state-machine`, `state-machine-last-transition`, `state-machine-available-transitions`, `state-machine-can-step-p`, `reset-state-machine`, `transition-from`, `transition-event-type`, `transition-to`, `transition-guard`, `transition-action`, `transition-metadata`, `state-machine-state`, `state-machine-initial-state`, `state-machine-transitions`, `state-machine-history`, `state-machine-metadata`
-- Pipeline APIs: `make-pipeline`, `define-pipeline`, `define-workflow`, `copy-pipeline`, `run-pipeline`, `run-pipeline-with-context`, `pipeline-graph`, `pipeline-stages`, `pipeline-metadata`
+- Pipeline APIs: `make-pipeline`, `define-pipeline`, `define-workflow`, `copy-pipeline`, `run-pipeline`, `run-pipeline-with-context`, `run-pipeline-sequence`, `pipeline-graph`, `pipeline-stages`, `pipeline-metadata`
+- Observability APIs: `pipeline->dot`, `pipeline->mermaid`, `pipeline-node-names`, `pipeline-stage-names`, `pipeline-source-names`, `pipeline-sink-names`, `format-trace`, `trace-summary`, `context-summary`
+- Pipeline extension APIs: `pipeline-to-plist`, `plist-to-pipeline`, `pipeline-validate`, `pipeline-stage-count`, `map-pipeline`, `pipeline->node`
+- Iterative pipeline APIs: `run-pipeline-times`, `run-pipeline-until-fixpoint`, `run-pipeline-while`
+- Batch event/effect APIs: `emit-events`, `perform-effects`, `event-of-type-p`, `effect-of-type-p`, `context-effect-results`, `context-effect-results-of-type`
+- Context & introspection APIs: `context-merge`, `context-trace-of-kind`, `flow-describe`, `flow-children`
+- Serialization APIs: `context-to-plist`, `plist-to-context`, `event-to-plist`, `plist-to-event`, `effect-to-plist`, `plist-to-effect`
+- Stream search APIs: `stream-find-index`, `stream-none-p`, `stream-mode`, `stream-cartesian`
+- Reactive subject APIs: `make-subject`, `subject-p`, `subject-subscribe`, `subject-unsubscribe`, `subject-emit`, `subject-subscriber-count`, `subject-map`, `subject-filter`, `subject-merge`, `subject-collect`
+- Reactive operator APIs: `subject-scan`, `subject-distinct`, `subject-tap`, `subject-take`, `subject-drop`, `subject-take-while`, `subject-drop-while`, `subject-count`, `subject-flat-map`, `subject-partition`, `subject-zip`, `subject-combine-latest`, `subject-buffer`
+- Effect ergonomics APIs: `register-effect-handler`, `context-effect-handler`, `effect-handled-p`, `context-effect-handler-types`, `with-effect-handler-scope`
+- Graph analysis APIs: `graph-node-names`, `graph-order`, `graph-size`, `graph-empty-p`, `graph-successors`, `graph-predecessors`, `graph-out-degree`, `graph-in-degree`, `graph-transpose`, `graph-acyclic-p`, `graph-strongly-connected-components`, `graph-connected-components`, `graph-topological-generations`, `graph-distance`
+- Graph export APIs: `graph->dot`, `graph->mermaid`, `graph-layout`, `graph-to-plist`, `plist-to-graph`
+- Graph mutation APIs: `remove-node`, `remove-edge`, `graph-subgraph`, `graph-merge`, `graph-relabel-node`, `graph-contract-edge`
+- Graph path APIs: `graph-transitive-closure`, `graph-transitive-reduction`, `graph-topological-rank`, `graph-longest-path`, `graph-all-paths`, `graph-find-cycle`, `graph-eulerian-path`, `graph-weighted-distance`, `graph-weighted-path`, `graph-weighted-distances-from`, `graph-max-flow`, `graph-min-cut`
+- Equality/reachability predicate APIs: `pipeline-equal-p`, `state-machine-equal-p`, `context-equal-p`, `state-machine-reachable-p`
+- Graph metric APIs: `graph-density`, `graph-degree-histogram`, `graph-clustering-coefficient`, `graph-average-clustering`, `graph-reciprocity`, `graph-bipartite-p`, `graph-greedy-coloring`, `graph-equal-p`, `graph-undirected-reachable-p`
+- Graph connectivity APIs: `graph-connected-p`, `graph-strongly-connected-p`, `graph-self-loop-nodes`, `graph-condensation`, `graph-distances-from`, `graph-bfs-order`, `graph-dfs-order`, `graph-eccentricity`, `graph-diameter`, `graph-radius`, `graph-center`, `graph-periphery`, `graph-wiener-index`, `graph-average-path-length`, `graph-closeness-centrality`, `graph-betweenness-centrality`
+- Graph algebra APIs: `graph-union`, `graph-intersection`, `graph-difference`, `graph-diff`, `graph-filter-nodes`, `graph-map-nodes`
+- Graph criticality APIs: `graph-articulation-points`, `graph-bridges`, `graph-dominators`, `graph-post-dominators`
+- State-machine analysis APIs: `state-machine-states`, `state-machine-event-types`, `state-machine-reachable-states`, `state-machine-unreachable-states`, `state-machine-terminal-states`, `state-machine-deterministic-p`, `state-machine->dot`, `state-machine->mermaid`
+- State-machine execution APIs: `state-machine-run-states`, `state-machine-accepts-p`, `state-machine-event-path`
+- State-machine builder APIs: `state-machine-to-plist`, `plist-to-state-machine`, `state-machine-complete-p`, `state-machine-transition-for`, `add-transition`, `remove-transition`, `state-machine-relabel-state`, `state-machine->graph`
+- Combinator APIs: `mapping-handler`, `compose-handlers`, `retrying-handler`, `fallback-handler`, `memoizing-handler`, `tapping-handler`, `wrap-node`, `node-with-retry`, `node-with-fallback`, `node-with-memoization`, `node-with-tap`, `contract-handler`, `node-with-contract`
+- Stream APIs: `flow-stream-p`, `empty-stream`, `list->stream`, `stream-of`, `stream-range`, `stream-map`, `stream-filter`, `stream-scan`, `stream-take`, `stream-drop`, `stream-take-while`, `stream-drop-while`, `stream-distinct`, `stream-flat-map`, `stream-concat`, `stream-zip`, `stream-tap`, `stream-collect`, `stream-reduce`, `stream-for-each`, `stream-count`, `stream-first`, `stream-empty-p`
+- Stream generator/window/aggregate APIs: `stream-iterate`, `stream-repeat`, `stream-cycle`, `stream-enumerate`, `stream-unfold`, `stream-chunk`, `stream-window`, `stream-partition-by`, `stream-sum`, `stream-min`, `stream-max`, `stream-find`, `stream-some`, `stream-every`, `stream-last`, `stream-nth`
+- Stream op/collector APIs: `stream-zip-with`, `stream-interleave`, `stream-take-nth`, `stream-dedupe-consecutive`, `stream-interpose`, `stream-distinct-by`, `stream-group-by`, `stream-frequencies`, `stream-index-by`, `stream-partition`, `stream-split-at`, `stream-average`
+- Stream statistics APIs: `stream-flatten`, `stream-scan1`, `stream-count-if`, `stream-variance`, `stream-stddev`, `stream-median`
 - Protocols: `flow-name`, `flow-metadata`, `flow-kind` across nodes, edges, graphs, contexts, events, effects, transitions, state machines, and pipelines
 - Testing helpers: `run-pipeline-with-test-context`, `assert-emitted-events`, `assert-performed-effects`, `assert-final-state`, `assert-state-machine-state`, `assert-pipeline-result`
 
@@ -190,6 +241,13 @@ Runnable examples are provided as plain scripts:
 - `examples/event-workflow.lisp` - a pipeline that emits events and advances a state machine
 - `examples/state-machine.lisp` - a standalone state machine transition flow
 - `examples/graph-analysis.lisp` - reachability analysis (descendants, ancestors, shortest path, boundaries) over a dataflow graph
+- `examples/graph-toolkit.lisp` - strongly connected components, topological generations, transpose, distance, and DOT/Mermaid rendering
+- `examples/state-machine-visualization.lisp` - state/event enumeration, reachability, terminal and unreachable states, and DOT/Mermaid rendering
+- `examples/resilient-pipeline.lisp` - retrying and fallback node wrappers plus result-threading pipeline sequencing
+- `examples/streams.lisp` - lazy stream pipelines (map/filter/take/scan/flat-map/distinct) over an unbounded range
+- `examples/graph-analysis-advanced.lisp` - critical path, topological rank, transitive reduction, weighted distance, density/bipartiteness, and a serialization round trip
+- `examples/stream-analytics.lisp` - frequencies, group-by, partition, sliding-window averages, and whole-stream mean
+- `examples/integration.lisp` - an end-to-end scenario composing pipelines, graph analysis, pull streams, reactive subjects, a state machine, and context serialization
 
 Run them with SBCL:
 
@@ -198,6 +256,13 @@ sbcl --script examples/simple-pipeline.lisp
 sbcl --script examples/event-workflow.lisp
 sbcl --script examples/state-machine.lisp
 sbcl --script examples/graph-analysis.lisp
+sbcl --script examples/graph-toolkit.lisp
+sbcl --script examples/state-machine-visualization.lisp
+sbcl --script examples/resilient-pipeline.lisp
+sbcl --script examples/streams.lisp
+sbcl --script examples/graph-analysis-advanced.lisp
+sbcl --script examples/stream-analytics.lisp
+sbcl --script examples/integration.lisp
 ```
 
 Expected outputs:
@@ -206,6 +271,13 @@ Expected outputs:
 - `examples/event-workflow.lisp` prints the final workflow state and event trace
 - `examples/state-machine.lisp` prints `Final state: completed`, the transition count, and the last transition record
 - `examples/graph-analysis.lisp` prints the downstream/upstream node sets, the shortest `ingest -> load` path, and the graph's source and sink nodes
+- `examples/graph-toolkit.lisp` prints the graph order/size, topological generations, `a -> d` distance, strongly connected components, and DOT/Mermaid diagrams
+- `examples/state-machine-visualization.lisp` prints the state and event sets, reachable/unreachable/terminal states, the determinism verdict, and DOT/Mermaid diagrams
+- `examples/resilient-pipeline.lisp` prints `Retry result: 70 (after 3 attempts)`, the fallback results, and the sequenced pipeline result
+- `examples/streams.lisp` prints `First 3 even squares: (4 16 36)`, the running totals, the flat-mapped list, and the distinct sum
+- `examples/graph-analysis-advanced.lisp` prints the critical path, topological rank, transitive-reduction edge count, weighted distance, density/bipartiteness, and the serialization round-trip check
+- `examples/stream-analytics.lisp` prints the event frequencies, parity grouping, partition, sliding-window averages, and the mean of 1..100
+- `examples/integration.lisp` prints the priced orders, high-value reactive alerts, the state-machine driving events, and a confirmed context serialization round trip
 
 ## Testing
 
