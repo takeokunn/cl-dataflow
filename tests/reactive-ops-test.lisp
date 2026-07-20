@@ -39,7 +39,11 @@
     (subject-emit a 2)     ; queued
     (subject-emit b 10)    ; pairs with 1
     (subject-emit b 20)    ; pairs with 2
-    (is (equal (funcall collector) '((1 . 10) (2 . 20))))))
+    (subject-emit a 3)     ; verifies queues can be reused after draining
+    (subject-emit b 30)
+    (subject-emit b 40)    ; reverse-side queued
+    (subject-emit a 4)
+    (is (equal (funcall collector) '((1 . 10) (2 . 20) (3 . 30) (4 . 40))))))
 
 (deftest subject-combine-latest-tracks-both
   (let* ((a (make-subject))

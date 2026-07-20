@@ -36,15 +36,20 @@ not modified."
                            (gethash name nodes) (gethash reached nodes))))
     result))
 
-(defun %reachable-set-table (graph)
-  "Name -> hash-set of names reachable through one or more edges."
-  (let ((adjacency (%graph-adjacency-snapshot graph :successors))
-        (table (%make-result-table)))
-    (dolist (name (%graph-node-name-set graph) table)
-      (let ((set (make-hash-table :test #'equal)))
-        (dolist (reached (%reachable-closure adjacency name))
-          (setf (gethash reached set) t))
-        (setf (gethash name table) set)))))
+(defun %reachable-through-successors-p (successors from to)
+  "Whether TO is reachable from FROM through SUCCESSORS, with early exit."
+  (let ((visited (%make-result-table))
+        (worklist (copy-list (gethash from successors))))
+    (loop while worklist do
+      (let ((name (pop worklist)))
+        (when (equal name to)
+          (return-from %reachable-through-successors-p t))
+        (unless (gethash name visited)
+          (setf (gethash name visited) t)
+          (dolist (successor (gethash name successors))
+            (unless (gethash successor visited)
+              (push successor worklist)))))))
+  nil)
 
 (defun graph-transitive-reduction (graph)
   "Return the transitive reduction of the (acyclic) GRAPH: the minimal edge set
@@ -54,18 +59,25 @@ is cyclic (the reduction is only unique on a DAG). GRAPH is not modified."
   (topological-sort graph)
   (let ((names (%graph-node-name-set graph))
         (successors (%graph-adjacency-snapshot graph :successors))
-        (reachable (%reachable-set-table graph))
+        (reachable (make-hash-table :test #'equal))
         (nodes (%graph-nodes-table graph))
         (result (make-graph :metadata (graph-metadata graph))))
     (dolist (name names)
       (add-node result (%copy-node-snapshot (gethash name nodes))))
-    (dolist (u names)
-      (dolist (v (gethash u successors))
-        (unless (some (lambda (w)
-                        (and (not (equal w v))
-                             (gethash v (gethash w reachable))))
-                      (gethash u successors))
-          (%add-derived-edge result u v (gethash u nodes) (gethash v nodes)))))
+    (labels ((reachable-p (from to)
+               (let ((key (cons from to)))
+                 (multiple-value-bind (cached present-p) (gethash key reachable)
+                   (if present-p
+                       cached
+                       (setf (gethash key reachable)
+                             (%reachable-through-successors-p successors from to)))))))
+      (dolist (u names)
+        (dolist (v (gethash u successors))
+          (unless (some (lambda (w)
+                          (and (not (equal w v))
+                               (reachable-p w v)))
+                        (gethash u successors))
+            (%add-derived-edge result u v (gethash u nodes) (gethash v nodes))))))
     result))
 
 (defun graph-topological-rank (graph)
@@ -371,18 +383,26 @@ a saturated forward edge."
 (defun %augmenting-path (residual neighbors source sink)
   "Breadth-first search for a shortest augmenting path in the residual graph.
 Return the predecessor map when SINK is reached, otherwise NIL."
-  (let ((parent (%make-result-table))
-        (queue (list source)))
-    (setf (gethash source parent) source)
-    (loop while queue
-          do (let ((node (pop queue)))
-               (dolist (next (gethash node neighbors))
-                 (when (and (not (nth-value 1 (gethash next parent)))
-                            (> (gethash (cons node next) residual 0) 0))
-                   (setf (gethash next parent) node)
-                   (setf queue (append queue (list next)))))))
-    (when (nth-value 1 (gethash sink parent))
-      parent)))
+  (let* ((parent (%make-result-table))
+         (queue (list source))
+         (tail queue))
+    (labels ((enqueue (value)
+               (let ((cell (list value)))
+                 (if queue
+                     (setf (cdr tail) cell
+                           tail cell)
+                     (setf queue cell
+                           tail cell)))))
+      (setf (gethash source parent) source)
+      (loop while queue
+            do (let ((node (pop queue)))
+                 (dolist (next (gethash node neighbors))
+                   (when (and (not (nth-value 1 (gethash next parent)))
+                              (> (gethash (cons node next) residual 0) 0))
+                     (setf (gethash next parent) node)
+                     (enqueue next)))))
+      (when (nth-value 1 (gethash sink parent))
+        parent))))
 
 (defun %augment-bottleneck (residual parent source sink)
   "The minimum residual capacity along the SOURCE->SINK path recorded in PARENT."
@@ -426,17 +446,25 @@ cut inspect after the search converges."
 (defun %residual-reachable (residual neighbors source)
   "The hash set of nodes reachable from SOURCE along positive-residual edges --
 the source side of the minimum cut once Edmonds-Karp has saturated the network."
-  (let ((seen (%make-result-table))
-        (queue (list source)))
-    (setf (gethash source seen) t)
-    (loop while queue
-          do (let ((node (pop queue)))
-               (dolist (next (gethash node neighbors))
-                 (when (and (not (nth-value 1 (gethash next seen)))
-                            (> (gethash (cons node next) residual 0) 0))
-                   (setf (gethash next seen) t)
-                   (setf queue (append queue (list next)))))))
-    seen))
+  (let* ((seen (%make-result-table))
+         (queue (list source))
+         (tail queue))
+    (labels ((enqueue (value)
+               (let ((cell (list value)))
+                 (if queue
+                     (setf (cdr tail) cell
+                           tail cell)
+                     (setf queue cell
+                           tail cell)))))
+      (setf (gethash source seen) t)
+      (loop while queue
+            do (let ((node (pop queue)))
+                 (dolist (next (gethash node neighbors))
+                   (when (and (not (nth-value 1 (gethash next seen)))
+                              (> (gethash (cons node next) residual 0) 0))
+                     (setf (gethash next seen) t)
+                     (enqueue next)))))
+      seen)))
 
 (defun graph-max-flow (graph source sink &key capacity-key default-capacity)
   "The maximum flow value from SOURCE to SINK over edge-metadata capacities

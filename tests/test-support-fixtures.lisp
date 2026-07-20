@@ -104,7 +104,8 @@
                        (make-pipeline :graph ,graph
                                       ,@(when pipeline-metadata
                                           `(:metadata ,pipeline-metadata))))))
-     ,@body))
+     (declare (ignorable ,graph ,pipeline ,source ,sink))
+     (locally ,@body)))
 
 
 
@@ -143,7 +144,8 @@
                        (add-edge ,graph ,source ,left :from-port "left")
                        (add-edge ,graph ,source ,right :from-port "right")
                        (make-pipeline :graph ,graph))))
-     ,@body))
+     (declare (ignorable ,graph ,pipeline ,source ,left ,right))
+     (locally ,@body)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %graph-fixture-node-binding (spec)

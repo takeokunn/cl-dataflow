@@ -20,7 +20,6 @@
 (deftest pipeline-constructor-and-setter-copy-graphs
   (with-linear-test-pipeline (graph pipeline source sink
                                     :source-metadata '((:kind :stage)))
-    (declare (ignore sink))
     (add-node graph (make-node "mutated"))
     (setf (node-metadata (find-node graph "source"))
           '((:kind :mutated)))
@@ -48,7 +47,6 @@
 (deftest pipeline-graph-setter-preserves-empty-stage-cache
   (let ((pipeline (make-pipeline)))
     (with-linear-test-pipeline (graph initialized-pipeline source sink)
-      (declare (ignore source sink))
       (setf (pipeline-graph pipeline) graph)
       (is (not (eq (pipeline-graph pipeline) graph)))
       (is (null (pipeline-stages pipeline)))
@@ -63,7 +61,6 @@
 
 (deftest pipeline-stages-setter-remaps-onto-live-graph
   (with-linear-test-pipeline (graph pipeline source sink)
-    (declare (ignore graph source sink))
     (let ((replacement (list (make-node "source")
                              (make-node "sink"))))
       (setf (pipeline-stages pipeline) replacement)
@@ -77,7 +74,6 @@
 
 (deftest pipeline-rejects-stale-stages-when-graph-cannot-resolve-them
   (with-linear-test-pipeline (graph pipeline source sink)
-    (declare (ignore source sink))
     (let ((orphan (make-node "orphan")))
       (with-captured-condition (condition node-not-found-error)
           (make-pipeline :graph graph :stages (list orphan))
@@ -88,7 +84,6 @@
 
 (deftest pipeline-constructor-remaps-stages-onto-copied-graph
   (with-linear-test-pipeline (graph pipeline source sink)
-    (declare (ignore graph))
     (is (not (eq (pipeline-graph pipeline) graph)))
     (is (not (eq (first (pipeline-stages pipeline)) source)))
     (is (not (eq (second (pipeline-stages pipeline)) sink)))
@@ -112,7 +107,6 @@
                                     :source-metadata '((:kind :source))
                                     :sink-metadata '((:kind :sink))
                                     :pipeline-metadata '((:pipeline :original)))
-    (declare (ignore graph sink))
     (setf (graph-metadata (pipeline-graph pipeline)) '((:kind :original)))
     (let ((copy (copy-pipeline pipeline)))
       (is (not (eq copy pipeline)))

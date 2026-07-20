@@ -127,6 +127,11 @@ from it, or 0 when NODE reaches nothing."
         (reduce #'max distances)
         0)))
 
+(defun %graph-eccentricities (graph)
+  "Return an alist (NAME . ECCENTRICITY), ordered like GRAPH-NODE-NAMES."
+  (loop for name in (graph-node-names graph)
+        collect (cons name (graph-eccentricity graph name))))
+
 (defun graph-closeness-centrality (graph node)
   "Return the closeness centrality of NODE: the number of nodes reachable from it
 divided by the total hop distance to all of them, or 0 when NODE reaches nothing. A
@@ -149,27 +154,35 @@ deep graphs are safe). Ordered by name."
     (dolist (name names)
       (setf (gethash name betweenness) 0))
     (dolist (source names)
-      (let ((stack '())
-            (predecessors (%make-result-table))
-            (sigma (%make-result-table))
-            (distance (%make-result-table))
-            (queue (list source)))
+      (let* ((stack '())
+             (predecessors (%make-result-table))
+             (sigma (%make-result-table))
+             (distance (%make-result-table))
+             (queue (list source))
+             (tail queue))
         (dolist (name names)
           (setf (gethash name predecessors) '()
                 (gethash name sigma) 0
                 (gethash name distance) -1))
         (setf (gethash source sigma) 1
               (gethash source distance) 0)
-        (loop while queue do
-          (let ((v (pop queue)))
-            (push v stack)
-            (dolist (w (gethash v successors))
-              (when (< (gethash w distance) 0)
-                (setf (gethash w distance) (1+ (gethash v distance)))
-                (setf queue (append queue (list w))))
-              (when (= (gethash w distance) (1+ (gethash v distance)))
-                (incf (gethash w sigma) (gethash v sigma))
-                (push v (gethash w predecessors))))))
+        (labels ((enqueue (value)
+                   (let ((cell (list value)))
+                     (if queue
+                         (setf (cdr tail) cell
+                               tail cell)
+                         (setf queue cell
+                               tail cell)))))
+          (loop while queue do
+            (let ((v (pop queue)))
+              (push v stack)
+              (dolist (w (gethash v successors))
+                (when (< (gethash w distance) 0)
+                  (setf (gethash w distance) (1+ (gethash v distance)))
+                  (enqueue w))
+                (when (= (gethash w distance) (1+ (gethash v distance)))
+                  (incf (gethash w sigma) (gethash v sigma))
+                  (push v (gethash w predecessors)))))))
         (let ((delta (%make-result-table)))
           (dolist (name names)
             (setf (gethash name delta) 0))
@@ -188,8 +201,7 @@ deep graphs are safe). Ordered by name."
   "Return the diameter of GRAPH: the largest eccentricity over all nodes -- the
 longest shortest-path distance between any reachable pair. 0 for a graph with no
 edges."
-  (let ((eccentricities (mapcar (lambda (name) (graph-eccentricity graph name))
-                                (graph-node-names graph))))
+  (let ((eccentricities (mapcar #'cdr (%graph-eccentricities graph))))
     (if eccentricities
         (reduce #'max eccentricities)
         0)))
@@ -198,8 +210,7 @@ edges."
   "Return the radius of GRAPH: the smallest eccentricity over all nodes. Under the
 directed, reaches-nothing-is-0 eccentricity convention (see GRAPH-ECCENTRICITY),
 any sink node makes the radius 0. 0 for a graph with no nodes."
-  (let ((eccentricities (mapcar (lambda (name) (graph-eccentricity graph name))
-                                (graph-node-names graph))))
+  (let ((eccentricities (mapcar #'cdr (%graph-eccentricities graph))))
     (if eccentricities
         (reduce #'min eccentricities)
         0)))
@@ -208,19 +219,23 @@ any sink node makes the radius 0. 0 for a graph with no nodes."
   "Return the center of GRAPH: the names of the nodes whose eccentricity equals the
 radius, ordered lexicographically. These are the nodes closest (in worst-case hops)
 to everything they reach. Empty for a graph with no nodes."
-  (let ((radius (graph-radius graph)))
-    (loop for name in (graph-node-names graph)
-          when (= (graph-eccentricity graph name) radius)
-          collect name)))
+  (let ((eccentricities (%graph-eccentricities graph)))
+    (when eccentricities
+      (let ((radius (reduce #'min eccentricities :key #'cdr)))
+        (loop for (name . eccentricity) in eccentricities
+              when (= eccentricity radius)
+              collect name)))))
 
 (defun graph-periphery (graph)
   "Return the periphery of GRAPH: the names of the nodes whose eccentricity equals
 the diameter, ordered lexicographically -- the most far-reaching nodes, those whose
 shortest paths stretch the whole diameter. Empty for a graph with no nodes."
-  (let ((diameter (graph-diameter graph)))
-    (loop for name in (graph-node-names graph)
-          when (= (graph-eccentricity graph name) diameter)
-          collect name)))
+  (let ((eccentricities (%graph-eccentricities graph)))
+    (when eccentricities
+      (let ((diameter (reduce #'max eccentricities :key #'cdr)))
+        (loop for (name . eccentricity) in eccentricities
+              when (= eccentricity diameter)
+              collect name)))))
 
 (defun %graph-distance-totals (graph)
   "Return (values SUM COUNT) over the shortest-path hop distances of every ordered

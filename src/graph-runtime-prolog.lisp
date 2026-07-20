@@ -196,6 +196,8 @@ only through a cycle)."
                   (gethash successor parent) from-name)
             (push successor frontier)))
         (setf frontier (nreverse frontier))
+        (when (gethash to-name parent)
+          (return-from graph-path (%reconstruct-path parent from-name to-name)))
         (loop while frontier do
           (let ((next '()))
             (dolist (name frontier)
@@ -203,6 +205,9 @@ only through a cycle)."
                 (unless (gethash successor enqueued)
                   (setf (gethash successor enqueued) t
                         (gethash successor parent) name)
+                  (when (equal successor to-name)
+                    (return-from graph-path
+                      (%reconstruct-path parent from-name to-name)))
                   (push successor next))))
             (setf frontier (nreverse next))))
         (when (gethash to-name parent)

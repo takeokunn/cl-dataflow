@@ -11,7 +11,8 @@
 (defstruct (subject (:constructor %make-subject ())
                     (:copier nil)
                     (:predicate subject-p))
-  (subscribers '()))
+  (subscribers '())
+  (subscriber-tail nil))
 
 (defun make-subject ()
   "Return a fresh subject with no subscribers."
@@ -21,14 +22,32 @@
   "Register FUNCTION (called with each emitted value) as a subscriber of SUBJECT,
 after any existing subscribers, and return FUNCTION (usable as an unsubscribe
 token)."
-  (setf (subject-subscribers subject)
-        (append (subject-subscribers subject) (list function)))
+  (let ((cell (list function)))
+    (if (subject-subscribers subject)
+        (setf (cdr (subject-subscriber-tail subject)) cell
+              (subject-subscriber-tail subject) cell)
+        (setf (subject-subscribers subject) cell
+              (subject-subscriber-tail subject) cell)))
   function)
+
+(defun %remove-subject-subscribers (subscribers function)
+  (let ((head nil)
+        (tail nil))
+    (dolist (subscriber subscribers (values head tail))
+      (unless (eql subscriber function)
+        (let ((cell (list subscriber)))
+          (if head
+              (setf (cdr tail) cell
+                    tail cell)
+              (setf head cell
+                    tail cell)))))))
 
 (defun subject-unsubscribe (subject function)
   "Remove FUNCTION from SUBJECT's subscribers (all occurrences) and return SUBJECT."
-  (setf (subject-subscribers subject)
-        (remove function (subject-subscribers subject)))
+  (multiple-value-bind (subscribers tail)
+      (%remove-subject-subscribers (subject-subscribers subject) function)
+    (setf (subject-subscribers subject) subscribers
+          (subject-subscriber-tail subject) tail))
   subject)
 
 (defun subject-subscriber-count (subject)

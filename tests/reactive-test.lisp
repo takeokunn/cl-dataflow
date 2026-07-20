@@ -38,6 +38,22 @@
     (is (equal seen '(:a)))
     (is (zerop (subject-subscriber-count subject)))))
 
+(deftest subject-subscribe-preserves-order-after-unsubscribe
+  (let ((subject (make-subject))
+        (seen '()))
+    (labels ((record (tag)
+               (lambda (value) (push (cons tag value) seen))))
+      (let ((first (record :first))
+            (second (record :second))
+            (third (record :third)))
+        (subject-subscribe subject first)
+        (subject-subscribe subject second)
+        (subject-unsubscribe subject first)
+        (subject-subscribe subject third)
+        (subject-emit subject :value)
+        (is (equal (reverse seen) '((:second . :value) (:third . :value))))
+        (is (= (subject-subscriber-count subject) 2))))))
+
 (deftest subject-map-transforms-emissions
   (let* ((source (make-subject))
          (doubled (subject-map source (lambda (x) (* x 2))))

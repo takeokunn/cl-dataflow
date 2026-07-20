@@ -109,8 +109,7 @@
              (effect (perform-effect context "log"
                                      :payload payload
                                      :metadata metadata))
-             (history (first (context-effects context)))
-             (trace (first (context-trace context))))
+             (history (first (context-effects context))))
         (setf (cadr payload) "changed"
               (cadar metadata) "worker"
               (cadr (cadr returned)) "changed"
