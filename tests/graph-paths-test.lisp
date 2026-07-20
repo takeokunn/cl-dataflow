@@ -71,7 +71,14 @@
                        ((a "a") (b "b") (c "c") (d "d"))
                        :edges ((a b) (a c) (b d) (c d)))
     (is (equal (graph-all-paths graph "a" "d")
-               '(("a" "b" "d") ("a" "c" "d")))))
+               '(("a" "b" "d") ("a" "c" "d"))))
+    (is (equal (graph-all-paths graph "a" "d" :max-depth 1) '()))
+    (is (equal (graph-all-paths graph "a" "d" :max-paths 0) '()))
+    (is (equal (graph-all-paths graph "a" "d" :max-paths nil)
+               '(("a" "b" "d") ("a" "c" "d"))))
+    (signals invalid-input-error (graph-all-paths graph "a" "d" :max-paths 1))
+    (signals invalid-input-error (graph-all-paths graph "a" "d" :max-paths 1.5))
+    (signals invalid-input-error (graph-all-paths graph "a" "d" :max-depth -1)))
   ;; FROM = TO is the trivial path.
   (with-graph-fixture (graph ((a "a")))
     (is (equal (graph-all-paths graph "a" "a") '(("a")))))
@@ -168,6 +175,21 @@
     (is (= (graph-weighted-distance graph "a" "b" :weight-key :cost :default-weight 10) 7))
     (is (= (graph-weighted-distance graph "a" "c" :weight-key :cost :default-weight 10) 17))))
 
+(deftest graph-weighted-rejects-invalid-weights
+  (let ((graph (%weighted-graph '("a" "b") '(("a" "b" -1)))))
+    (signals invalid-input-error
+      (graph-weighted-distance graph "a" "b"))
+    (signals invalid-input-error
+      (graph-weighted-path graph "a" "b"))
+    (signals invalid-input-error
+      (graph-weighted-distances-from graph "a")))
+  (let ((graph (%weighted-graph '("a" "b") '(("a" "b" :heavy)))))
+    (signals invalid-input-error
+      (graph-weighted-distance graph "a" "b")))
+  (with-graph-fixture (graph ((a "a") (b "b")) :edges ((a b)))
+    (signals invalid-input-error
+      (graph-weighted-distance graph "a" "b" :default-weight -1))))
+
 (deftest graph-weighted-distances-from-runs-dijkstra-to-all
   ;; From a: b costs 2 directly; c is cheaper via b (2+3=5) than the direct a->c
   ;; edge of 10, so Dijkstra must relax it down. Ordered by name; a itself is
@@ -234,6 +256,25 @@
           '(:capacity 3))
     (setf (edge-metadata (add-edge graph "a" "t")) '(:capacity 6))
     (is (= (graph-max-flow graph "s" "t") 6))))
+
+(deftest graph-flow-rejects-invalid-capacities
+  (let ((graph (make-graph)))
+    (dolist (name '("s" "t"))
+      (add-node graph (make-node name)))
+    (setf (edge-metadata (add-edge graph "s" "t")) '(:capacity -1))
+    (signals invalid-input-error
+      (graph-max-flow graph "s" "t"))
+    (signals invalid-input-error
+      (graph-min-cut graph "s" "t")))
+  (let ((graph (make-graph)))
+    (dolist (name '("s" "t"))
+      (add-node graph (make-node name)))
+    (setf (edge-metadata (add-edge graph "s" "t")) '(:capacity :many))
+    (signals invalid-input-error
+      (graph-max-flow graph "s" "t")))
+  (with-graph-fixture (graph ((s "s") (target "t")) :edges ((s target)))
+    (signals invalid-input-error
+      (graph-max-flow graph "s" "t" :default-capacity -1))))
 
 (deftest graph-min-cut-finds-the-bottleneck-edges
   ;; s->a->b->t with a unit middle edge: the max-flow min-cut theorem places

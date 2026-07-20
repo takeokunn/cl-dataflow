@@ -61,6 +61,7 @@
 (deftest define-workflow-builds-machine-and-pipeline-from-unified-dsl
   (with-defined-workflow (pipeline machine)
       (define-workflow (:initial-state "idle"
+                        :history-limit 2
                         :machine-metadata '((:kind :workflow))
                         :pipeline-metadata '((:layer :integration))
                         :stages '("source" "machine-step"))
@@ -73,6 +74,7 @@
         (:edge "source" "machine-step")
         (:machine-node :name "machine-step"))
     (is (equal (state-machine-state machine) "idle"))
+    (is (= (state-machine-history-limit machine) 2))
     (is (equal (state-machine-metadata machine) '((:kind :workflow))))
     (is (equal (graph-metadata (pipeline-graph pipeline))
                '((:layer :integration))))

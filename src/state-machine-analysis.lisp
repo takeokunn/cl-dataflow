@@ -119,44 +119,54 @@ on guards rather than on the (state, event) pair alone."
                         (%state-machine-transitions-list machine))
                 #'string< :key #'car)))
 
+(defun write-state-machine-dot (machine stream &key (name "S"))
+  "Render MACHINE as Graphviz DOT to STREAM and return MACHINE."
+  (format stream "digraph ~A {~%" (%dot-escape name))
+  (format stream "  __start [shape=point];~%")
+  (format stream "  __start -> \"~A\";~%"
+          (%dot-escape (state-machine-initial-state machine)))
+  (dolist (state (state-machine-states machine))
+    (format stream "  \"~A\";~%" (%dot-escape state)))
+  (dolist (transition (%sorted-transition-snapshots machine))
+    (format stream "  \"~A\" -> \"~A\" [label=\"~A\"];~%"
+            (%dot-escape (transition-from transition))
+            (%dot-escape (transition-to transition))
+            (%dot-escape (transition-event-type transition))))
+  (format stream "}~%")
+  machine)
+
 (defun state-machine->dot (machine &key (name "S"))
   "Render MACHINE as a Graphviz DOT digraph. States are nodes, transitions are
 edges labelled with their event type, and a point-shaped source marks the initial
 state. Output is deterministic (states name-sorted, transitions endpoint-sorted)."
   (with-output-to-string (out)
-    (format out "digraph ~A {~%" (%dot-escape name))
-    (format out "  __start [shape=point];~%")
-    (format out "  __start -> \"~A\";~%"
-            (%dot-escape (state-machine-initial-state machine)))
-    (dolist (state (state-machine-states machine))
-      (format out "  \"~A\";~%" (%dot-escape state)))
-    (dolist (transition (%sorted-transition-snapshots machine))
-      (format out "  \"~A\" -> \"~A\" [label=\"~A\"];~%"
-              (%dot-escape (transition-from transition))
-              (%dot-escape (transition-to transition))
-              (%dot-escape (transition-event-type transition))))
-    (format out "}~%")))
+    (write-state-machine-dot machine out :name name)))
 
 (defun %state-machine-ids (states)
   (loop for state in states
         for index from 0
         collect (cons state (format nil "s~D" index))))
 
+(defun write-state-machine-mermaid (machine stream)
+  "Render MACHINE as Mermaid stateDiagram-v2 to STREAM and return MACHINE."
+  (let* ((states (state-machine-states machine))
+         (ids (%state-machine-ids states)))
+    (flet ((id-for (state) (cdr (assoc state ids :test #'equal))))
+      (format stream "stateDiagram-v2~%")
+      (dolist (state states)
+        (format stream "  state \"~A\" as ~A~%" (%mermaid-escape state) (id-for state)))
+      (format stream "  [*] --> ~A~%"
+              (id-for (state-machine-initial-state machine)))
+      (dolist (transition (%sorted-transition-snapshots machine))
+        (format stream "  ~A --> ~A: ~A~%"
+                (id-for (transition-from transition))
+                (id-for (transition-to transition))
+                (%mermaid-escape (transition-event-type transition))))))
+  machine)
+
 (defun state-machine->mermaid (machine)
   "Render MACHINE as a Mermaid stateDiagram-v2 string. State names become quoted
 labels on generated ids, so names with spaces or punctuation render cleanly; the
 initial state is linked from Mermaid's [*] start marker."
-  (let* ((states (state-machine-states machine))
-         (ids (%state-machine-ids states)))
-    (flet ((id-for (state) (cdr (assoc state ids :test #'equal))))
-      (with-output-to-string (out)
-        (format out "stateDiagram-v2~%")
-        (dolist (state states)
-          (format out "  state \"~A\" as ~A~%" (%mermaid-escape state) (id-for state)))
-        (format out "  [*] --> ~A~%"
-                (id-for (state-machine-initial-state machine)))
-        (dolist (transition (%sorted-transition-snapshots machine))
-          (format out "  ~A --> ~A: ~A~%"
-                  (id-for (transition-from transition))
-                  (id-for (transition-to transition))
-                  (%mermaid-escape (transition-event-type transition))))))))
+  (with-output-to-string (out)
+    (write-state-machine-mermaid machine out)))

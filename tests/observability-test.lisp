@@ -48,6 +48,36 @@ steps a state machine so the resulting context's trace holds all four entry kind
     ;; Entries are numbered chronologically from zero.
     (is (search "0. " text))))
 
+(deftest format-trace-escapes-control-characters
+  (let* ((spoof (format nil "spoof~%tab~Creturn~Cdel~Cend"
+                        #\Tab #\Return (code-char 127)))
+         (effect-type (format nil "effect-~A" spoof))
+         (machine (make-state-machine
+                   :state (format nil "idle-~A" spoof)
+                   :transitions (list (make-transition
+                                       (format nil "idle-~A" spoof)
+                                       (format nil "go-~A" spoof)
+                                       (format nil "running-~A" spoof)))))
+         (handlers (make-test-effect-handlers
+                    effect-type (lambda (effect context)
+                                  (declare (ignore effect context))
+                                  :ok)))
+         (context (make-context :effect-handlers handlers)))
+    (emit-event context (format nil "event-~A" spoof))
+    (perform-effect context effect-type)
+    (step-state-machine machine
+                        (format nil "go-~A" spoof)
+                        :context context)
+    (let ((text (format-trace context)))
+      (is (search "\\ntab" text))
+      (is (search "\\treturn" text))
+      (is (search "\\rdel" text))
+      (is (search "\\x7F;end" text))
+      (is (not (search (format nil "~%tab") text)))
+      (is (not (search (format nil "~Creturn" #\Tab) text)))
+      (is (not (search (format nil "~Cdel" #\Return) text)))
+      (is (not (search (format nil "~Cend" (code-char 127)) text))))))
+
 (deftest format-trace-of-empty-context-is-blank
   (is (string= (format-trace (make-context)) "")))
 

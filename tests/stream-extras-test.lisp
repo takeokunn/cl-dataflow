@@ -51,32 +51,63 @@
 
 (deftest stream-sum-adds-elements
   (is (= (stream-sum (stream-of 1 2 3 4)) 10))
+  (is (= (stream-sum (stream-of 1 2 3) :limit 3) 6))
   (is (= (stream-sum (empty-stream)) 0))
-  (is (= (stream-sum (stream-of '(:n 3) '(:n 4)) :key #'second) 7)))
+  (is (= (stream-sum (stream-of '(:n 3) '(:n 4)) :key #'second) 7))
+  (signals invalid-input-error
+    (stream-sum (stream-of 1 2 3) :limit 2)))
 
 (deftest stream-min-and-max-find-extremes
   (is (= (stream-min (stream-of 3 1 2)) 1))
+  (is (= (stream-min (stream-of 3 1 2) :limit 3) 1))
   (is (= (stream-max (stream-of 3 1 2)) 3))
+  (is (= (stream-max (stream-of 3 1 2) :limit 3) 3))
   (is (eq (stream-min (empty-stream) :default :none) :none))
   (is (eq (stream-max (empty-stream) :default :none) :none))
   ;; Keyed extremes return the whole element.
   (is (equal (stream-min (stream-of '(:score 5) '(:score 2) '(:score 9)) :key #'second)
-             '(:score 2))))
+             '(:score 2)))
+  (signals invalid-input-error
+    (stream-min (stream-of 3 1 2) :limit 2))
+  (signals invalid-input-error
+    (stream-max (stream-of 3 1 2) :limit 2)))
 
 (deftest stream-find-and-some
   (is (= (stream-find #'evenp (stream-of 1 3 4 6)) 4))
+  (is (= (stream-find #'evenp (stream-of 1 3 4 6) :limit 3) 4))
+  (is (= (stream-find #'evenp (stream-of 1 3 4 6) nil :limit 3) 4))
   (is (eq (stream-find #'evenp (stream-of 1 3 5) :none) :none))
+  (signals invalid-input-error
+    (stream-find #'evenp (stream-of 1 3 5) :none :limit 2))
+  (signals invalid-input-error
+    (stream-find #'evenp (stream-of 1 3 5) :limit 2 :extra))
+  (signals invalid-input-error
+    (stream-find #'evenp (stream-of 1 3 5) :none :limit))
+  (signals invalid-input-error
+    (stream-find #'evenp (stream-of 1 3 5) :none :bogus 2))
   (is (= (stream-some (lambda (x) (and (evenp x) (* x 100))) (stream-of 1 3 4)) 400))
-  (is (null (stream-some (lambda (x) (and (evenp x) x)) (stream-of 1 3 5)))))
+  (is (= (stream-some (lambda (x) (and (evenp x) (* x 100)))
+                      (stream-of 1 3 4)
+                      :limit 3)
+         400))
+  (is (null (stream-some (lambda (x) (and (evenp x) x)) (stream-of 1 3 5))))
+  (signals invalid-input-error
+    (stream-some (lambda (x) (and (evenp x) x)) (stream-of 1 3 5) :limit 2)))
 
 (deftest stream-every-checks-all
   (is (stream-every #'evenp (stream-of 2 4 6)))
   (is (not (stream-every #'evenp (stream-of 2 3 4))))
-  (is (stream-every #'evenp (empty-stream))))
+  (is (not (stream-every #'evenp (stream-of 2 3 4) :limit 2)))
+  (is (stream-every #'evenp (empty-stream)))
+  (signals invalid-input-error
+    (stream-every #'evenp (stream-of 2 4 6) :limit 2)))
 
 (deftest stream-last-and-nth
   (is (= (stream-last (stream-of 1 2 3)) 3))
+  (is (= (stream-last (stream-of 1 2 3) nil :limit 3) 3))
   (is (eq (stream-last (empty-stream) :none) :none))
+  (signals invalid-input-error
+    (stream-last (stream-of 1 2 3) nil :limit 2))
   (is (= (stream-nth 2 (stream-of :a :b 42 :d)) 42))
   (is (eq (stream-nth 10 (stream-of :a :b) :none) :none))
   (is (eq (stream-nth 0 (stream-of :first :second)) :first)))

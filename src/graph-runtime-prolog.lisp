@@ -19,8 +19,8 @@
           graph
           edge
           (format nil "Edge references missing node: ~A -> ~A"
-                  (edge-from edge)
-                  (edge-to edge))))
+                  (%escaped-display-string (edge-from edge))
+                  (%escaped-display-string (edge-to edge)))))
       (push (cl-prolog:make-clause
               (list +graph-edge-predicate+
                     (edge-from edge)

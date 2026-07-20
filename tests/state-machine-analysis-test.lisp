@@ -54,7 +54,10 @@
     (let ((dot (state-machine->dot machine :name "sm")))
       (is (search "digraph sm {" dot))
       (is (search "__start -> \"idle\";" dot))
-      (is (search "\"idle\" -> \"running\" [label=\"start\"];" dot)))))
+      (is (search "\"idle\" -> \"running\" [label=\"start\"];" dot))
+      (is (equal dot
+                 (with-output-to-string (out)
+                   (is (eq machine (write-state-machine-dot machine out :name "sm")))))))))
 
 (deftest state-machine->mermaid-renders-state-diagram
   (with-state-machine-fixture (machine
@@ -65,7 +68,30 @@
       (is (search "[*] --> " mermaid))
       ;; idle sorts before running, so idle is s0 and running is s1.
       (is (search "state \"idle\" as s0" mermaid))
-      (is (search "s0 --> s1: start" mermaid)))))
+      (is (search "s0 --> s1: start" mermaid))
+      (is (equal mermaid
+                 (with-output-to-string (out)
+                   (is (eq machine (write-state-machine-mermaid machine out)))))))))
+
+(deftest state-machine-renderers-escape-control-characters
+  (let* ((spoof (format nil "spoof~%tab~Creturn~Cdel~Cend"
+                        #\Tab #\Return (code-char 127)))
+         (machine (make-state-machine
+                   :state (format nil "idle-~A" spoof)
+                   :transitions (list (make-transition (format nil "idle-~A" spoof)
+                                                       (format nil "start-~A" spoof)
+                                                       (format nil "running-~A" spoof))))))
+    (dolist (rendered (list (state-machine->dot machine
+                                                :name (format nil "sm-~A" spoof))
+                            (state-machine->mermaid machine)))
+      (is (search "\\ntab" rendered))
+      (is (search "\\treturn" rendered))
+      (is (search "\\rdel" rendered))
+      (is (search "\\x7F;end" rendered))
+      (is (not (search (format nil "~%tab") rendered)))
+      (is (not (search (format nil "~Creturn" #\Tab) rendered)))
+      (is (not (search (format nil "~Cdel" #\Return) rendered)))
+      (is (not (search (format nil "~Cend" (code-char 127)) rendered))))))
 
 (deftest state-machine-successor-table-deduplicates-parallel-transitions
   ;; Two transitions go draft -> review on different events; reachability must

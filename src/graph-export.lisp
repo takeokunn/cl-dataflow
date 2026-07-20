@@ -35,7 +35,11 @@
 
 (defun %dot-escape (string)
   "Escape STRING for use inside a DOT double-quoted identifier."
-  (%replace-substring (%replace-substring string "\\" "\\\\") "\"" "\\\""))
+  (%replace-substring
+   (%replace-substring
+    (%escaped-display-string string)
+    "\\" "\\\\")
+   "\"" "\\\""))
 
 (defun graph->dot (graph &key (name "G"))
   "Render GRAPH as a Graphviz DOT digraph string.
@@ -57,7 +61,7 @@ edges across different ports stay distinguishable."
 
 (defun %mermaid-escape (string)
   "Escape STRING for use inside a Mermaid bracketed label."
-  (%replace-substring string "\"" "&quot;"))
+  (%replace-substring (%escaped-display-string string) "\"" "&quot;"))
 
 (defun %mermaid-node-ids (node-names)
   "Alist mapping each node name to a syntactically safe Mermaid id (n0, n1, ...)."

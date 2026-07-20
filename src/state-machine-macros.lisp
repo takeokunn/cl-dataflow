@@ -6,13 +6,16 @@
       (error 'invalid-input-error
              :expected `(property-list ,allowed-keys)
              :value options
-             :detail (format nil "~A options must be a property list." context)))
+             :detail (format nil "~A options must be a property list."
+                             (%escaped-display-string context))))
     (loop for (key nil) on options by #'cddr
           do (unless (member key allowed-keys)
                (error 'invalid-input-error
                       :expected allowed-keys
                       :value key
-                      :detail (format nil "Unsupported ~A option: ~S" context key)))))
+                      :detail (format nil "Unsupported ~A option: ~S"
+                                      (%escaped-display-string context)
+                                      key)))))
 
   (defun %parse-state-machine-clause (clause)
     (unless (and (listp clause) (>= (length clause) 3))
@@ -27,7 +30,8 @@
                         ,@options)))
 
   (defun %parse-state-machine-definition (options clauses)
-    (%macro-validate-option-list options '(:state :initial-state :history :metadata)
+    (%macro-validate-option-list options
+                                  '(:state :initial-state :history :history-limit :metadata)
                                  "DEFINE-STATE-MACHINE")
     `(make-state-machine
       ,@options

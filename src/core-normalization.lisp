@@ -33,7 +33,9 @@
         (error 'invalid-input-error
                :expected 'port-list
                :value normalized
-               :detail (format nil "Duplicate ~A port: ~A" kind port)))
+               :detail (format nil "Duplicate ~A port: ~A"
+                               kind
+                               (%escaped-display-string port))))
       (setf (gethash port seen) t))))
 
 (defun %normalize-metadata (metadata)

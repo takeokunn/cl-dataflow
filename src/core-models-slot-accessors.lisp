@@ -15,6 +15,17 @@
 (defmethod (setf context-state) (state (context context))
   (setf (slot-value context 'state) state))
 
+(defmethod state-machine-history-limit ((machine state-machine))
+  (slot-value machine 'history-limit))
+
+(defmethod (setf state-machine-history-limit) (limit (machine state-machine))
+  (let ((resolved-limit (%validate-state-machine-history-limit limit)))
+    (setf (slot-value machine 'history-limit) resolved-limit)
+    (setf (%state-machine-history-list machine)
+          (%trim-transition-history (%state-machine-history-list machine)
+                                    resolved-limit))
+    resolved-limit))
+
 (define-slot-apis
   (:read-only event-type event type)
   (:read-only event-trace-index event trace-index)
@@ -48,8 +59,10 @@
               (%copy-structured-value (slot-value transition 'metadata))
               (%normalize-metadata value))
   (:transform state-machine-history machine history
-              (copy-tree (slot-value machine 'history))
-              (%copy-transition-history value))
+              (%copy-transition-history (slot-value machine 'history))
+              (%trim-transition-history
+               (%copy-transition-history value)
+               (state-machine-history-limit machine)))
   (:transform state-machine-metadata machine metadata
               (%copy-structured-value (slot-value machine 'metadata))
               (%normalize-metadata value))

@@ -10,6 +10,23 @@
     (subject-emit subject 3)
     (is (equal (funcall collector) '(1 2 3)))))
 
+(deftest subject-collect-supports-bounded-history
+  (let* ((subject (make-subject))
+         (collector (subject-collect subject :limit 2 :on-limit :drop-newest)))
+    (subject-emit subject 1)
+    (subject-emit subject 2)
+    (subject-emit subject 3)
+    (is (equal (funcall collector) '(1 2)))))
+
+(deftest subject-collect-errors-when-limit-is-exceeded
+  (let* ((subject (make-subject))
+         (collector (subject-collect subject :limit 2)))
+    (subject-emit subject 1)
+    (subject-emit subject 2)
+    (signals invalid-input-error
+      (subject-emit subject 3))
+    (is (equal (funcall collector) '(1 2)))))
+
 (deftest subject-unsubscribe-stops-delivery
   (let* ((subject (make-subject))
          (seen '())

@@ -59,6 +59,7 @@
    (initial-state :initarg :initial-state)
    (transitions :initarg :transitions :initform '())
    (history :initarg :history :initform '())
+   (history-limit :initarg :history-limit :initform nil)
    (metadata :initarg :metadata :initform '())))
 
 (defclass pipeline ()
@@ -68,15 +69,15 @@
 
 (defmethod print-object ((node node) stream)
   (print-unreadable-object (node stream :type t)
-    (format stream "~A" (node-name node))))
+    (format stream "~A" (%escaped-display-string (node-name node)))))
 
 (defmethod print-object ((edge edge) stream)
   (print-unreadable-object (edge stream :type t)
     (format stream "~A:~A -> ~A:~A"
-            (edge-from edge)
-            (edge-from-port edge)
-            (edge-to edge)
-            (edge-to-port edge))))
+            (%escaped-display-string (edge-from edge))
+            (%escaped-display-string (edge-from-port edge))
+            (%escaped-display-string (edge-to edge))
+            (%escaped-display-string (edge-to-port edge)))))
 
 (defmethod print-object ((graph graph) stream)
   (let ((node-count (hash-table-count (%graph-nodes-table graph)))
@@ -93,14 +94,14 @@
 (defmethod print-object ((transition state-transition) stream)
   (print-unreadable-object (transition stream :type t)
     (format stream "~A --~A--> ~A"
-            (transition-from transition)
-            (transition-event-type transition)
-            (transition-to transition))))
+            (%escaped-display-string (transition-from transition))
+            (%escaped-display-string (transition-event-type transition))
+            (%escaped-display-string (transition-to transition)))))
 
 (defmethod print-object ((machine state-machine) stream)
   (print-unreadable-object (machine stream :type t)
     (format stream "~A transitions=~D"
-            (state-machine-state machine)
+            (%escaped-display-string (state-machine-state machine))
             (length (state-machine-transitions machine)))))
 
 (define-type-predicates

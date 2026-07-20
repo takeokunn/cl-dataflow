@@ -81,7 +81,8 @@ GRAPH-A's). Neither input is modified."
           (when (find-node result name)
             (%signal-graph-error
              result
-             (format nil "Cannot merge graphs: duplicate node name ~A" name)))
+             (format nil "Cannot merge graphs: duplicate node name ~A"
+                     (%escaped-display-string name))))
           (add-node result (%copy-node-snapshot (gethash name nodes))))))
     (dolist (source (list graph-a graph-b))
       (dolist (edge (reverse (%graph-edges-list source)))
@@ -143,7 +144,8 @@ not modified."
     (when (gethash new nodes)
       (%signal-graph-error
        graph
-       (format nil "Cannot relabel to existing node name ~A" new)))
+       (format nil "Cannot relabel to existing node name ~A"
+               (%escaped-display-string new))))
     (let ((result (make-graph :metadata (graph-metadata graph))))
       (dolist (name (%graph-node-name-set graph))
         (let ((snapshot (%copy-node-snapshot (gethash name nodes))))

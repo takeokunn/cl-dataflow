@@ -75,6 +75,50 @@
       (is (equal (state-machine-history updated-machine)
                   (list transition-record))))))
 
+(deftest state-machine-history-limit-bounds-recorded-transitions
+  (let ((machine (make-state-machine
+                  :state "idle"
+                  :history-limit 2
+                  :transitions (list (make-transition "idle" "tick" "running")
+                                     (make-transition "running" "tick" "idle")))))
+    (step-state-machine machine "tick")
+    (step-state-machine machine "tick")
+    (step-state-machine machine "tick")
+    (let ((history (state-machine-history machine)))
+      (is (= (length history) 2))
+      (is (equal (mapcar (lambda (record) (getf record :from)) history)
+                 '("idle" "running"))))))
+
+(deftest state-machine-history-limit-zero-disables-history-retention
+  (let ((machine (make-state-machine
+                  :state "idle"
+                  :history-limit 0
+                  :transitions (list (make-transition "idle" "start" "running")))))
+    (step-state-machine machine "start")
+    (is (null (state-machine-history machine)))))
+
+(deftest state-machine-history-limit-validates-and-trims-history-setters
+  (let ((machine (make-state-machine
+                  :state "idle"
+                  :transitions (list (make-transition "idle" "tick" "running")
+                                     (make-transition "running" "tick" "idle")))))
+    (signals invalid-input-error
+      (make-state-machine :state "idle" :history-limit -1))
+    (step-state-machine machine "tick")
+    (step-state-machine machine "tick")
+    (setf (state-machine-history-limit machine) 1)
+    (is (= (state-machine-history-limit machine) 1))
+    (is (= (length (state-machine-history machine)) 1))
+    (setf (state-machine-history machine)
+          (list '(:from "manual-1") '(:from "manual-2")))
+    (is (equal (state-machine-history machine)
+               '((:from "manual-1"))))))
+
+(deftest state-machine-copy-preserves-history-limit
+  (let ((copy (copy-state-machine
+               (make-state-machine :state "idle" :history-limit 3))))
+    (is (= (state-machine-history-limit copy) 3))))
+
 (deftest state-machine-step-defaults-guard-and-action-to-pass-through
   (let ((machine (make-state-machine
                   :state "idle"
@@ -90,9 +134,14 @@
         (:action-result nil)))))
 
 (deftest state-machine-history-helpers-return-independent-snapshots
-  (let ((machine (make-state-machine
+  (let* ((payload (vector (list :nested "ok")))
+         (machine (make-state-machine
                   :state "idle"
-                  :transitions (list (make-transition "idle" "start" "running")))))
+                  :transitions (list (make-transition
+                                      "idle" "start" "running"
+                                      :action (lambda (machine event context)
+                                                (declare (ignore machine event context))
+                                                (values nil payload)))))))
     (multiple-value-bind (updated-machine transition-record)
         (step-state-machine machine "start")
       (let ((history (state-machine-history updated-machine))
@@ -101,9 +150,50 @@
         (is (not (eq (first history-copy) transition-record)))
         (set-plist-entry (first history) :action-result :mutated)
         (set-plist-entry (first history-copy) :action-result :mutated)
-        (assert-transition-records (list (first (state-machine-history updated-machine))
-                                          (first (state-machine-history updated-machine)))
-          (:action-result nil))))))
+        (setf (second (aref (getf transition-record :action-result) 0)) "mutated-return")
+        (let ((internal-result
+                (getf (first (state-machine-history updated-machine)) :action-result)))
+          (setf (second (aref internal-result 0)) "mutated-snapshot"))
+        (dolist (record (list (first (state-machine-history updated-machine))
+                              (first (state-machine-history updated-machine))))
+          (let ((action-result (getf record :action-result)))
+            (is (not (eq action-result payload)))
+            (is (equalp action-result #((:nested "ok"))))))))))
+
+(deftest state-machine-history-copies-hash-table-action-results
+  (let* ((payload (make-hash-table :test #'equal))
+         (nested (vector (list :nested "ok")))
+         (machine (make-state-machine
+                   :state "idle"
+                   :transitions (list (make-transition
+                                       "idle" "start" "running"
+                                       :action (lambda (machine event context)
+                                                 (declare (ignore machine event context))
+                                                 (values nil payload)))))))
+    (setf (gethash "payload" payload) nested)
+    (multiple-value-bind (updated-machine transition-record)
+        (step-state-machine machine "start")
+      (let ((returned-result (getf transition-record :action-result))
+            (history-result (getf (first (state-machine-history updated-machine))
+                                  :action-result)))
+        (is (hash-table-p returned-result))
+        (is (hash-table-p history-result))
+        (is (not (eq returned-result payload)))
+        (is (not (eq history-result payload)))
+        (is (not (eq (gethash "payload" returned-result) nested)))
+        (is (not (eq (gethash "payload" history-result) nested)))
+        (is (equalp (gethash "payload" returned-result)
+                    #((:nested "ok"))))
+        (is (equalp (gethash "payload" history-result)
+                    #((:nested "ok"))))
+        (setf (second (aref (gethash "payload" returned-result) 0))
+              "mutated-return")
+        (setf (second (aref (gethash "payload" history-result) 0))
+              "mutated-history")
+        (let ((fresh-result (getf (first (state-machine-history updated-machine))
+                                  :action-result)))
+          (is (equalp (gethash "payload" fresh-result)
+                      #((:nested "ok")))))))))
 
 (deftest state-machine-reset-keeps-history
   (let ((machine (make-state-machine

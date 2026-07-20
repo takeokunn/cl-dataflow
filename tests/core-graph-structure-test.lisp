@@ -277,3 +277,42 @@
     (is (equal (invalid-input-value captured) '(:missing "node")))
     (is (equal (invalid-input-detail captured)
                 "Expected NODE, got (:MISSING \"node\")"))))
+
+(deftest graph-condition-details-escape-control-characters
+  (let* ((raw (format nil "spoof~%tab~Creturn~Cdel~Cend"
+                       #\Tab
+                       #\Return
+                       (code-char 127)))
+          (port (format nil "out-~A" raw)))
+    (with-captured-condition (captured invalid-input-error)
+        (make-node "source" :outputs (list port port))
+      (let ((detail (invalid-input-detail captured))
+            (report (condition-report-string captured)))
+        (is (search "\\n" detail))
+        (is (search "\\t" detail))
+        (is (search "\\r" detail))
+        (is (search "\\x7F;" detail))
+        (is (search "\\n" report))
+        (is (not (search (format nil "~%tab") detail)))
+        (is (not (search (format nil "~Creturn" #\Tab) detail)))
+        (is (not (search (format nil "~Cdel" #\Return) detail))))))
+  (let* ((raw (format nil "missing~%tab~Creturn~Cdel~Cend"
+                       #\Tab
+                       #\Return
+                       (code-char 127)))
+          (captured nil))
+    (handler-case
+        (add-edge (make-graph) raw "sink")
+      (node-not-found-error (condition)
+        (setf captured condition)))
+    (is captured)
+    (let ((detail (graph-error-detail captured))
+          (report (condition-report-string captured)))
+      (is (search "\\n" detail))
+      (is (search "\\t" detail))
+      (is (search "\\r" detail))
+      (is (search "\\x7F;" detail))
+      (is (search "\\n" report))
+      (is (not (search (format nil "~%tab") detail)))
+      (is (not (search (format nil "~Creturn" #\Tab) detail)))
+      (is (not (search (format nil "~Cdel" #\Return) detail))))))

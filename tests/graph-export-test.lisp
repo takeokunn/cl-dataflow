@@ -17,6 +17,29 @@
   (with-graph-fixture (graph ((weird "a\"b")))
     (is (search "\"a\\\"b\"" (graph->dot graph)))))
 
+(deftest graph->dot-and-mermaid-escape-control-characters
+  (let* ((spoof (format nil "a~%tab~Creturn~Cdel~Cb"
+                        #\Tab #\Return (code-char 127)))
+         (name spoof)
+         (graph (make-graph)))
+    (add-node graph (make-node name :outputs (list (format nil "out~%~C~Cport"
+                                                            #\Tab #\Return))))
+    (add-node graph (make-node "sink" :inputs (list (format nil "in~%~C~Cport"
+                                                            #\Tab #\Return))))
+    (add-edge graph name "sink"
+              :from-port (format nil "out~%~C~Cport" #\Tab #\Return)
+              :to-port (format nil "in~%~C~Cport" #\Tab #\Return))
+    (dolist (rendered (list (graph->dot graph :name (format nil "g~%~C~Cname"
+                                                            #\Tab (code-char 127)))
+                            (graph->mermaid graph)))
+      (is (search "\\n" rendered))
+      (is (search "\\t" rendered))
+      (is (search "\\r" rendered))
+      (is (search "\\x7F;" rendered))
+      (is (not (search (format nil "~%tab") rendered)))
+      (is (not (search (format nil "~Creturn" #\Tab) rendered)))
+      (is (not (search (format nil "~Cdel" #\Return) rendered))))))
+
 (deftest graph->mermaid-renders-flowchart
   (with-graph-fixture (graph
                        ((a "a") (b "b"))
