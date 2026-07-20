@@ -133,28 +133,56 @@ list for a graph with no edges. Signals GRAPH-CYCLE-ERROR when GRAPH is cyclic."
                 collect name
                 collect #\Nul)))
 
-(defun graph-all-paths (graph from to)
+(defun %validate-non-negative-limit (name value)
+  (when (and value (or (not (integerp value)) (minusp value)))
+    (error 'invalid-input-error
+           :expected '(or null (integer 0 *))
+           :value value
+           :detail (format nil "~A must be NIL or a non-negative integer." name))))
+
+(defun %signal-path-limit-exceeded (limit)
+  (error 'invalid-input-error
+         :expected 'path-count-within-max-paths
+         :value limit
+         :detail (format nil "GRAPH-ALL-PATHS exceeded MAX-PATHS (~D)." limit)))
+
+(defun graph-all-paths (graph from to &key (max-paths 10000) max-depth)
   "Return every simple path (no repeated node) from FROM to TO as a list of
 name-lists, ordered deterministically. FROM = TO yields the single trivial path
-(FROM). Enumeration is exponential in the worst case and intended for small graphs.
-Signals NODE-NOT-FOUND-ERROR for unknown endpoints."
+(FROM). Enumeration is exponential in the worst case and intended for small graphs;
+MAX-PATHS bounds the number of returned paths (NIL disables the bound) and
+MAX-DEPTH bounds the number of edges in a path. Signals NODE-NOT-FOUND-ERROR for
+unknown endpoints."
+  (%validate-non-negative-limit :max-paths max-paths)
+  (%validate-non-negative-limit :max-depth max-depth)
   (let ((from-name (%node-designator-name from))
         (to-name (%node-designator-name to)))
     (%ensure-graph-node graph from-name)
     (%ensure-graph-node graph to-name)
+    (when (eql max-paths 0)
+      (return-from graph-all-paths '()))
     (let ((successors (%graph-adjacency-snapshot graph :successors))
           (visited (make-hash-table :test #'equal))
-          (results '()))
-      (labels ((walk (current path)
-                 (if (equal current to-name)
-                     (push (reverse path) results)
-                     (dolist (next (gethash current successors))
-                       (unless (gethash next visited)
-                         (setf (gethash next visited) t)
-                         (walk next (cons next path))
-                         (remhash next visited))))))
+          (results '())
+          (path-count 0))
+      (labels ((record-path (path)
+                 (when (and max-paths (>= path-count max-paths))
+                   (%signal-path-limit-exceeded max-paths))
+                 (incf path-count)
+                 (push (reverse path) results))
+               (walk (current path depth)
+                 (cond ((equal current to-name)
+                        (record-path path))
+                       ((and max-depth (>= depth max-depth))
+                        nil)
+                       (t
+                        (dolist (next (gethash current successors))
+                          (unless (gethash next visited)
+                            (setf (gethash next visited) t)
+                            (walk next (cons next path) (1+ depth))
+                            (remhash next visited)))))))
         (setf (gethash from-name visited) t)
-        (walk from-name (list from-name)))
+        (walk from-name (list from-name) 0))
       (sort (nreverse results) #'string< :key #'%path-sort-key))))
 
 (defun %component-cyclic-p (graph component)
@@ -171,9 +199,19 @@ component, so it is safe on deep graphs."
       (let ((start (first component)))
         (return (graph-path (graph-subgraph graph component) start start))))))
 
-(defun %edge-weight (edge weight-key default-weight)
-  (let ((weight (getf (edge-metadata edge) weight-key)))
-    (if weight weight default-weight)))
+(defun %validate-non-negative-edge-value (caller key value)
+  (unless (and (realp value) (not (minusp value)))
+    (error 'invalid-input-error
+           :expected 'non-negative-real
+           :value value
+           :detail (format nil "~A ~A must be a non-negative real number."
+                           caller
+                           (%escaped-display-string key))))
+  value)
+
+(defun %edge-weight (edge weight-key default-weight caller)
+  (let ((weight (getf (edge-metadata edge) weight-key default-weight)))
+    (%validate-non-negative-edge-value caller weight-key weight)))
 
 (defun %weighted-adjacency (graph weight-key default-weight)
   "Name -> list of (TO-NAME . COST). Parallel edges collapse to their cheapest."
@@ -182,7 +220,7 @@ component, so it is safe on deep graphs."
       (setf (gethash name adjacency) (make-hash-table :test #'equal)))
     (dolist (edge (%graph-edges-list graph))
       (let* ((bucket (gethash (edge-from edge) adjacency))
-             (cost (%edge-weight edge weight-key default-weight))
+             (cost (%edge-weight edge weight-key default-weight "GRAPH-WEIGHTED"))
              (existing (gethash (edge-to edge) bucket)))
         (when (or (null existing) (< cost existing))
           (setf (gethash (edge-to edge) bucket) cost))))
@@ -318,7 +356,7 @@ a saturated forward edge."
     (dolist (edge (%graph-edges-list graph))
       (let ((from (edge-from edge))
             (to (edge-to edge))
-            (capacity (%edge-weight edge capacity-key default-capacity)))
+            (capacity (%edge-weight edge capacity-key default-capacity "GRAPH-FLOW")))
         (incf (gethash (cons from to) residual 0) capacity)
         (setf (gethash to (gethash from adjacency)) t)
         (setf (gethash from (gethash to adjacency)) t)))

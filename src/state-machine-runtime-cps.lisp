@@ -59,9 +59,14 @@
         :action-result (%copy-structured-value action-result)))
 
 (defun %record-transition-history (machine transition-record)
-  (setf (slot-value machine 'history)
-        (cons (%copy-transition-record transition-record)
-              (%state-machine-history-list machine))))
+  (let ((history-limit (state-machine-history-limit machine)))
+    (setf (slot-value machine 'history)
+          (%trim-transition-history
+           (if (eql history-limit 0)
+               '()
+               (cons (%copy-transition-record transition-record)
+                     (%state-machine-history-list machine)))
+           history-limit))))
 
 (defun %record-context-trace (context transition-record)
   (when context

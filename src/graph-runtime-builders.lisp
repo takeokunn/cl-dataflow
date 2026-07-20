@@ -6,7 +6,8 @@
                 (%signal-node-not-found-error graph
                                               stage
                                               (format nil "Pipeline stage is not present in the graph: ~A"
-                                                      (node-name stage)))))
+                                                      (%escaped-display-string
+                                                       (node-name stage))))))
           stages))
 
 (defun (setf pipeline-graph) (graph-value pipeline)

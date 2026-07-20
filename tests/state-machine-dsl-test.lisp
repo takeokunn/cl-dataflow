@@ -2,12 +2,14 @@
 
 (deftest define-state-machine-builds-a-machine-from-declarative-clauses
   (let* ((machine (define-state-machine (:initial-state "idle"
+                                        :history-limit 2
                                         :metadata '((:kind :workflow)))
                     ("idle" "start" "running"
                      :metadata '((:transition :start)))
                     ("running" "finish" "done")))
          (transitions (state-machine-transitions machine)))
     (is (equal (state-machine-state machine) "idle"))
+    (is (= (state-machine-history-limit machine) 2))
     (is (equal (state-machine-metadata machine) '((:kind :workflow))))
     (is (= (length transitions) 2))
     (is (equal (transition-metadata (first transitions))

@@ -12,6 +12,9 @@
 
 (deftest stream-count-if-counts-matches
   (is (= (stream-count-if #'evenp (stream-of 1 2 3 4 5 6)) 3))
+  (is (= (stream-count-if #'evenp (stream-of 1 2 3 4) :limit 4) 2))
+  (signals invalid-input-error
+    (stream-count-if #'evenp (stream-of 1 2 3) :limit 2))
   (is (= (stream-count-if #'evenp (empty-stream)) 0)))
 
 (deftest stream-variance-and-stddev
@@ -21,9 +24,15 @@
   (is (null (stream-variance (empty-stream))))
   (is (null (stream-stddev (empty-stream))))
   ;; Keyed variance over structured elements.
-  (is (= (stream-variance (stream-of '(:v 2) '(:v 4)) :key #'second) 1)))
+  (is (= (stream-variance (stream-of '(:v 2) '(:v 4)) :key #'second) 1))
+  (signals invalid-input-error
+    (stream-variance (stream-of 1 2 3) :limit 2))
+  (signals invalid-input-error
+    (stream-stddev (stream-of 1 2 3) :limit 2)))
 
 (deftest stream-median-of-odd-and-even-counts
   (is (= (stream-median (stream-of 3 1 2)) 2))
   (is (= (stream-median (stream-of 4 1 3 2)) 5/2))
+  (signals invalid-input-error
+    (stream-median (stream-of 1 2 3) :limit 2))
   (is (null (stream-median (empty-stream)))))

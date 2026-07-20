@@ -19,7 +19,7 @@
              :effect-type (effect-type effect)
              :effect (%copy-effect effect)
              :detail (format nil "No effect handler registered for ~A"
-                             (effect-type effect))))
+                             (%escaped-display-string (effect-type effect)))))
     (let ((result (funcall handler effect context)))
       (setf (effect-result effect) result)
       (setf (slot-value context 'effects)

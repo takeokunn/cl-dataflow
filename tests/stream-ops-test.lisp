@@ -40,15 +40,23 @@
 
 (deftest stream-group-by-buckets-by-key
   (is (equal (stream-group-by #'evenp (stream-of 1 2 3 4 5))
-             '((nil 1 3 5) (t 2 4)))))
+             '((nil 1 3 5) (t 2 4))))
+  (is (equal (stream-group-by #'evenp (stream-of 1 2) :limit 2)
+             '((nil 1) (t 2))))
+  (signals invalid-input-error
+    (stream-group-by #'evenp (stream-of 1 2 3) :limit 2)))
 
 (deftest stream-frequencies-counts-occurrences
   (is (equal (stream-frequencies (stream-of :a :b :a :a :b :c))
-             '((:a . 3) (:b . 2) (:c . 1)))))
+             '((:a . 3) (:b . 2) (:c . 1))))
+  (signals invalid-input-error
+    (stream-frequencies (stream-of :a :b :c) :limit 2)))
 
 (deftest stream-index-by-keeps-last-per-key
   (is (equal (stream-index-by (lambda (x) (mod x 2)) (stream-of 1 2 3 4))
-             '((1 . 3) (0 . 4)))))
+             '((1 . 3) (0 . 4))))
+  (signals invalid-input-error
+    (stream-index-by #'identity (stream-of :a :b :c) :limit 2)))
 
 (deftest stream-partition-splits-by-predicate
   (multiple-value-bind (evens odds) (stream-partition #'evenp (stream-of 1 2 3 4 5 6))
@@ -67,6 +75,9 @@
 (deftest stream-average-computes-the-mean
   (is (= (stream-average (stream-of 1 2 3 4)) 5/2))
   (is (= (stream-average (stream-of '(:v 10) '(:v 20)) :key #'second) 15))
+  (is (= (stream-average (stream-of 1 2 3) :limit 3) 2))
+  (signals invalid-input-error
+    (stream-average (stream-of 1 2 3) :limit 2))
   (is (null (stream-average (empty-stream)))))
 
 (deftest stream-distinct-by-dedupes-on-a-key
@@ -74,4 +85,7 @@
   (is (equal (stream-collect (stream-distinct-by (lambda (x) (mod x 3))
                                                  (stream-of 1 4 2 5 3)))
              '(1 2 3)))
-  (is (null (stream-collect (stream-distinct-by #'identity (empty-stream))))))
+  (is (null (stream-collect (stream-distinct-by #'identity (empty-stream)))))
+  (signals invalid-input-error
+    (stream-collect (stream-distinct-by #'identity (stream-of :a :b :c)
+                                        :max-distinct 2))))

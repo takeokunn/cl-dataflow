@@ -31,7 +31,35 @@
                   (render edge)))
       (is (search "CONTEXT" (render context)))
       (is (search "events=2 effects=1"
-                  (render context))))))
+                   (render context))))))
+
+(deftest protocol-print-object-escapes-control-characters
+  (flet ((render (object)
+           (with-output-to-string (stream)
+             (print-object object stream))))
+    (let* ((spoof (format nil "spoof~%tab~Creturn~Cdel~Cend"
+                          #\Tab #\Return (code-char 127)))
+           (node (make-node (format nil "source-~A" spoof)))
+           (edge (make-edge (format nil "source-~A" spoof)
+                            (format nil "sink-~A" spoof)
+                            :from-port (format nil "out-~A" spoof)
+                            :to-port (format nil "input-~A" spoof)))
+           (transition (make-transition (format nil "idle-~A" spoof)
+                                        (format nil "start-~A" spoof)
+                                        (format nil "running-~A" spoof)))
+           (machine (make-state-machine :state (format nil "idle-~A" spoof))))
+      (dolist (rendered (list (render node)
+                              (render edge)
+                              (render transition)
+                              (render machine)))
+        (is (search "\\ntab" rendered))
+        (is (search "\\treturn" rendered))
+        (is (search "\\rdel" rendered))
+        (is (search "\\x7F;end" rendered))
+        (is (not (search (format nil "~%tab") rendered)))
+        (is (not (search (format nil "~Creturn" #\Tab) rendered)))
+        (is (not (search (format nil "~Cdel" #\Return) rendered)))
+        (is (not (search (format nil "~Cend" (code-char 127)) rendered)))))))
 
 (deftest constructors-normalize-and-copy-input-data
   (let* ((metadata (list (list :labels "alpha")))

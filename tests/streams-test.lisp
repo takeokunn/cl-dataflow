@@ -50,7 +50,9 @@
   (is (equal (stream-collect (stream-distinct (stream-of 1 2 1 3 2 4)))
              '(1 2 3 4)))
   (is (equal (stream-collect (stream-distinct (stream-of "a" "b" "a") :test 'equal))
-             '("a" "b"))))
+             '("a" "b")))
+  (signals invalid-input-error
+    (stream-collect (stream-distinct (stream-of 1 2 3) :max-distinct 2))))
 
 (deftest stream-flat-map-concatenates-sub-streams
   (is (equal (stream-collect
@@ -81,7 +83,13 @@
 
 (deftest stream-reduce-count-first-and-emptiness
   (is (= (stream-reduce #'+ 0 (stream-of 1 2 3 4)) 10))
+  (is (= (stream-reduce #'+ 0 (stream-of 1 2 3) :limit 3) 6))
+  (signals invalid-input-error
+    (stream-reduce #'+ 0 (stream-of 1 2 3) :limit 2))
   (is (= (stream-count (stream-of 1 2 3)) 3))
+  (is (= (stream-count (stream-of 1 2 3) :limit 3) 3))
+  (signals invalid-input-error
+    (stream-count (stream-of 1 2 3) :limit 2))
   (is (= (stream-first (stream-of 9 8 7)) 9))
   (is (eq (stream-first (empty-stream) :none) :none))
   (is (not (stream-empty-p (stream-of 1))))
@@ -90,7 +98,33 @@
 (deftest stream-for-each-runs-side-effects
   (let ((total 0))
     (stream-for-each (lambda (x) (incf total x)) (stream-of 1 2 3 4))
-    (is (= total 10))))
+    (is (= total 10)))
+  (let ((total 0))
+    (stream-for-each (lambda (x) (incf total x)) (stream-of 1 2 3) :limit 3)
+    (is (= total 6)))
+  (signals invalid-input-error
+    (stream-for-each (lambda (x) x) (stream-of 1 2 3) :limit 2)))
+
+(deftest stream-collect-supports-bounded-consumption
+  (is (equal (stream-collect (stream-of 1 2 3) :limit 3) '(1 2 3)))
+  (signals invalid-input-error
+    (stream-collect (stream-of 1 2 3) :limit 2))
+  (signals invalid-input-error
+    (stream-collect (stream-of 1 2 3) :limit -1))
+  (signals invalid-input-error
+    (stream-count (stream-of 1 2 3) :limit 1.5))
+  (signals invalid-input-error
+    (stream-collect (stream-of 1 2 3) :limit 2 :on-limit :bogus))
+  (let ((forced 0))
+    (is (equal (stream-collect
+                (stream-tap (lambda (x)
+                              (declare (ignore x))
+                              (incf forced))
+                            (stream-range 0 100))
+                :limit 2
+                :on-limit :truncate)
+               '(0 1)))
+    (is (= forced 2))))
 
 ;;; --- Laziness and purity -------------------------------------------------
 

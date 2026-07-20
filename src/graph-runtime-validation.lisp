@@ -15,10 +15,10 @@
   (%signal-graph-error
     graph
     (format nil "Edge ~A -> ~A uses unknown ~A port ~A"
-            (edge-from edge)
-            (edge-to edge)
+            (%escaped-display-string (edge-from edge))
+            (%escaped-display-string (edge-to edge))
             kind
-            port)))
+            (%escaped-display-string port))))
 
 (defun %validate-node-port-list (graph node kind ports)
   (let ((seen (make-hash-table :test #'equal)))
@@ -26,9 +26,9 @@
       (when (gethash port seen)
         (%signal-graph-error graph
                               (format nil "Node ~A has duplicate ~A port ~A"
-                                      (node-name node)
+                                      (%escaped-display-string (node-name node))
                                       kind
-                                      port)))
+                                      (%escaped-display-string port))))
       (setf (gethash port seen) t))))
 
 (defun %ensure-node (designator)
@@ -55,7 +55,8 @@
     (or node
         (%signal-node-not-found-error graph
                                       designator
-                                      (format nil "Node not found: ~A" name)))))
+                                      (format nil "Node not found: ~A"
+                                              (%escaped-display-string name))))))
 
 (defun %validate-node-ports (graph edge)
   (let ((from-node (find-node graph (edge-from edge)))
@@ -64,12 +65,12 @@
       (%signal-node-not-found-error graph
                                     edge
                                     (format nil "Missing source node: ~A"
-                                            (edge-from edge))))
+                                            (%escaped-display-string (edge-from edge)))))
     (unless to-node
       (%signal-node-not-found-error graph
                                     edge
                                     (format nil "Missing destination node: ~A"
-                                            (edge-to edge))))
+                                            (%escaped-display-string (edge-to edge)))))
     (%validate-node-port-lists graph from-node)
     (%validate-node-port-lists graph to-node)
     (unless (member (edge-from-port edge) (%node-outputs-list from-node) :test #'equal)
@@ -102,7 +103,8 @@ acyclicity, so a legally constructed cyclic graph stays inspectable."
     (when (find-node graph (node-name normalized-node))
       (%signal-graph-error graph
                             (format nil "Node already exists: ~A"
-                                    (node-name normalized-node))))
+                                    (%escaped-display-string
+                                     (node-name normalized-node)))))
     (let ((name (node-name normalized-node))
           (nodes (%graph-nodes-table graph)))
       (setf (gethash name nodes) normalized-node))
@@ -114,10 +116,10 @@ acyclicity, so a legally constructed cyclic graph stays inspectable."
 (defun %signal-duplicate-edge (graph edge)
   (%signal-graph-error graph
                         (format nil "Edge already exists: ~A:~A -> ~A:~A"
-                                (edge-from edge)
-                                (edge-from-port edge)
-                                (edge-to edge)
-                                (edge-to-port edge))))
+                                (%escaped-display-string (edge-from edge))
+                                (%escaped-display-string (edge-from-port edge))
+                                (%escaped-display-string (edge-to edge))
+                                (%escaped-display-string (edge-to-port edge)))))
 
 (defun add-edge (graph from to &key from-port to-port)
   ;; Multiple edges may legitimately target the same (to . to-port): the graph

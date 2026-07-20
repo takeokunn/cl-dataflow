@@ -67,9 +67,24 @@ PREDICATE is true."
     (dolist (source subjects result)
       (subject-subscribe source (lambda (value) (subject-emit result value))))))
 
-(defun subject-collect (subject)
+(defun subject-collect (subject &key limit (on-limit :error))
   "Subscribe a collector to SUBJECT and return a function of no arguments yielding
-the list of values SUBJECT has emitted since, in emission order."
-  (let ((collected '()))
-    (subject-subscribe subject (lambda (value) (push value collected)))
+the list of values SUBJECT has emitted since, in emission order.
+LIMIT bounds retained values. ON-LIMIT is :ERROR (signal from SUBJECT-EMIT) or
+:DROP-NEWEST (ignore values after LIMIT)."
+  (%validate-stream-limit limit "SUBJECT-COLLECT")
+  (%validate-stream-limit-mode on-limit "SUBJECT-COLLECT" '(:error :drop-newest))
+  (let ((collected '())
+        (count 0))
+    (subject-subscribe subject
+                       (lambda (value)
+                         (cond ((and limit (= count limit))
+                                (ecase on-limit
+                                  (:error (%signal-stream-limit-exceeded
+                                           "SUBJECT-COLLECT"
+                                           limit))
+                                  (:drop-newest nil)))
+                               (t
+                                (push value collected)
+                                (incf count)))))
     (lambda () (reverse collected))))

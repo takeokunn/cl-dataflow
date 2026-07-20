@@ -140,12 +140,13 @@
 
   (defun %parse-workflow-definition (options clauses)
     (%macro-validate-option-list options
-                                  '(:state :initial-state :history
+                                  '(:state :initial-state :history :history-limit
                                     :machine-metadata :pipeline-metadata :stages)
                                   "DEFINE-WORKFLOW")
     (%with-plist-bindings (options ((state :state)
                                     (initial-state :initial-state)
                                     (history :history)
+                                    (history-limit :history-limit)
                                     (machine-metadata :machine-metadata)
                                     (pipeline-metadata :pipeline-metadata)
                                     (stages :stages)))
@@ -164,6 +165,7 @@
                             ,@(%plist-option :state state)
                             ,@(%plist-option :initial-state initial-state)
                             ,@(%plist-option :history history)
+                            ,@(%plist-option :history-limit history-limit)
                             ,@(%plist-option :metadata machine-metadata)
                             :transitions (list ,@transition-forms)))
                   ,@(when pipeline-metadata-var

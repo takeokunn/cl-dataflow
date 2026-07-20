@@ -138,7 +138,29 @@ element fails PREDICATE, the remainder is emitted unchanged."
                  ((funcall predicate (car step)) (setf current (cdr step)))
                  (t (return (cons (car step) (cdr step)))))))))))
 
-(defun %stream-distinct (stream seen test)
+(defun %validate-stream-limit (limit caller)
+  (unless (or (null limit) (and (integerp limit) (not (minusp limit))))
+    (error 'invalid-input-error
+           :expected 'non-negative-integer-or-nil
+           :value limit
+           :detail (format nil "~A limit must be a non-negative integer or NIL." caller)))
+  limit)
+
+(defun %signal-stream-limit-exceeded (caller limit)
+  (error 'invalid-input-error
+         :expected (list :at-most limit)
+         :value limit
+         :detail (format nil "~A exceeded limit ~D." caller limit)))
+
+(defun %validate-stream-limit-mode (mode caller valid-modes)
+  (unless (member mode valid-modes)
+    (error 'invalid-input-error
+           :expected valid-modes
+           :value mode
+           :detail (format nil "~A on-limit must be one of ~S." caller valid-modes)))
+  mode)
+
+(defun %stream-distinct (stream seen test max-distinct)
   (%make-flow-stream
    (lambda ()
      (let ((current stream)
@@ -149,15 +171,23 @@ element fails PREDICATE, the remainder is emitted unchanged."
                  ((member (car step) already :test test)
                   (setf current (cdr step)))
                  (t (return (cons (car step)
-                                  (%stream-distinct (cdr step)
-                                                    (cons (car step) already)
-                                                    test)))))))))))
+                                  (progn
+                                    (when (and max-distinct
+                                               (>= (length already) max-distinct))
+                                      (%signal-stream-limit-exceeded "STREAM-DISTINCT"
+                                                                     max-distinct))
+                                    (%stream-distinct (cdr step)
+                                                      (cons (car step) already)
+                                                      test
+                                                      max-distinct))))))))))))
 
-(defun stream-distinct (stream &key (test 'equal))
+(defun stream-distinct (stream &key (test 'equal) max-distinct)
   "Return a stream of the elements of STREAM with duplicates (under TEST) removed,
 keeping the first occurrence of each. Runs in O(n^2) in the number of distinct
-elements, so it suits small to moderate streams."
-  (%stream-distinct stream '() test))
+elements, so it suits small to moderate streams. MAX-DISTINCT bounds the number
+of retained distinct values and signals INVALID-INPUT-ERROR when exceeded."
+  (%validate-stream-limit max-distinct "STREAM-DISTINCT")
+  (%stream-distinct stream '() test max-distinct))
 
 (defun %stream-flat-map-cont (function inner outer)
   (%make-flow-stream
@@ -226,43 +256,69 @@ side effect as the element passes through."
 
 ;;; --- Consumers (stream -> value) -----------------------------------------
 
-(defun stream-collect (stream)
-  "Force STREAM and return its elements as a fresh list."
+(defun stream-collect (stream &key limit (on-limit :error))
+  "Force STREAM and return its elements as a fresh list.
+LIMIT bounds the number of elements accepted. ON-LIMIT is :ERROR (signal when the
+stream contains more than LIMIT elements) or :TRUNCATE (return the first LIMIT
+elements without forcing more input)."
+  (%validate-stream-limit limit "STREAM-COLLECT")
+  (%validate-stream-limit-mode on-limit "STREAM-COLLECT" '(:error :truncate))
   (let ((result '())
-        (current stream))
+        (current stream)
+        (count 0))
     (loop
+      (when (and limit (= count limit) (eq on-limit :truncate))
+        (return (nreverse result)))
       (let ((step (%stream-step current)))
         (when (eq step :end) (return (nreverse result)))
+        (when (and limit (= count limit))
+          (%signal-stream-limit-exceeded "STREAM-COLLECT" limit))
         (push (car step) result)
+        (incf count)
         (setf current (cdr step))))))
 
-(defun stream-reduce (function seed stream)
+(defun stream-reduce (function seed stream &key limit)
   "Fold STREAM left to right under FUNCTION starting from SEED, returning the final
-accumulator."
+accumulator. LIMIT bounds the number of input elements accepted."
+  (%validate-stream-limit limit "STREAM-REDUCE")
   (let ((accumulator seed)
-        (current stream))
+        (current stream)
+        (count 0))
     (loop
       (let ((step (%stream-step current)))
         (when (eq step :end) (return accumulator))
+        (when (and limit (= count limit))
+          (%signal-stream-limit-exceeded "STREAM-REDUCE" limit))
         (setf accumulator (funcall function accumulator (car step)))
+        (incf count)
         (setf current (cdr step))))))
 
-(defun stream-for-each (function stream)
-  "Call FUNCTION on each element of STREAM for its side effect. Returns no values."
-  (let ((current stream))
+(defun stream-for-each (function stream &key limit)
+  "Call FUNCTION on each element of STREAM for its side effect. Returns no values.
+LIMIT bounds the number of input elements accepted."
+  (%validate-stream-limit limit "STREAM-FOR-EACH")
+  (let ((current stream)
+        (count 0))
     (loop
       (let ((step (%stream-step current)))
         (when (eq step :end) (return (values)))
+        (when (and limit (= count limit))
+          (%signal-stream-limit-exceeded "STREAM-FOR-EACH" limit))
         (funcall function (car step))
+        (incf count)
         (setf current (cdr step))))))
 
-(defun stream-count (stream)
-  "Return the number of elements in STREAM."
+(defun stream-count (stream &key limit)
+  "Return the number of elements in STREAM. LIMIT bounds the number of input
+elements accepted."
+  (%validate-stream-limit limit "STREAM-COUNT")
   (let ((count 0)
         (current stream))
     (loop
       (let ((step (%stream-step current)))
         (when (eq step :end) (return count))
+        (when (and limit (= count limit))
+          (%signal-stream-limit-exceeded "STREAM-COUNT" limit))
         (incf count)
         (setf current (cdr step))))))
 

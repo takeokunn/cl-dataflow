@@ -5,7 +5,7 @@
 (defun %write-condition-detail-report (condition stream detail-reader)
   (format stream "~A: ~A"
           (type-of condition)
-          (funcall detail-reader condition)))
+          (%escaped-display-string (funcall detail-reader condition))))
 
 (defun %write-graph-cycle-report (condition stream)
   (%write-condition-detail-report
@@ -13,7 +13,8 @@
    stream
    (lambda (graph-condition)
      (let ((detail (graph-error-detail graph-condition))
-           (cycle-nodes (mapcar #'node-name
+           (cycle-nodes (mapcar (lambda (node)
+                                  (%escaped-display-string (node-name node)))
                                 (graph-cycle-nodes graph-condition))))
        (if cycle-nodes
            (format nil "~A Cyclic nodes: ~{~A~^, ~}" detail cycle-nodes)

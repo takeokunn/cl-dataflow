@@ -87,7 +87,7 @@ collapsed to a single element. Non-adjacent duplicates are kept."
            (cons (car step)
                  (%stream-interpose-rest separator (cdr step))))))))
 
-(defun %stream-distinct-by (function stream seen test)
+(defun %stream-distinct-by (function stream seen test max-distinct)
   (%make-flow-stream
    (lambda ()
      (let ((current stream)
@@ -95,67 +95,93 @@ collapsed to a single element. Non-adjacent duplicates are kept."
        (loop
          (let ((step (%stream-step current)))
            (cond ((eq step :end) (return :end))
-                 ((member (funcall function (car step)) already :test test)
-                  (setf current (cdr step)))
-                 (t (return (cons (car step)
-                                  (%stream-distinct-by function
-                                                       (cdr step)
-                                                       (cons (funcall function (car step)) already)
-                                                       test)))))))))))
+                 (t
+                  (let* ((value (car step))
+                         (key (funcall function value)))
+                    (if (member key already :test test)
+                        (setf current (cdr step))
+                        (return (cons value
+                                      (progn
+                                        (when (and max-distinct
+                                                   (>= (length already) max-distinct))
+                                          (%signal-stream-limit-exceeded "STREAM-DISTINCT-BY"
+                                                                         max-distinct))
+                                        (%stream-distinct-by function
+                                                             (cdr step)
+                                                             (cons key already)
+                                                             test
+                                                             max-distinct))))))))))))))
 
-(defun stream-distinct-by (function stream &key (test 'equal))
+(defun stream-distinct-by (function stream &key (test 'equal) max-distinct)
   "Return a stream of the elements of STREAM whose key (FUNCALL FUNCTION ELEMENT) has
 not appeared before (under TEST), keeping the first element for each key. The
-key-projected analog of STREAM-DISTINCT; O(n^2) in the number of distinct keys."
-  (%stream-distinct-by function stream '() test))
+key-projected analog of STREAM-DISTINCT; O(n^2) in the number of distinct keys.
+MAX-DISTINCT bounds retained distinct keys and signals INVALID-INPUT-ERROR when
+exceeded."
+  (%validate-stream-limit max-distinct "STREAM-DISTINCT-BY")
+  (%stream-distinct-by function stream '() test max-distinct))
 
 ;;; --- Terminal collectors -------------------------------------------------
 
-(defun %stream-group-into (stream key-function value-function)
+(defun %stream-group-into (stream key-function value-function limit caller)
   "Fold STREAM into (VALUES TABLE FIRST-SEEN-KEY-ORDER), applying VALUE-FUNCTION to
 accumulate (OLD-OR-NIL, PRESENT-P, ELEMENT) into each key's cell."
+  (%validate-stream-limit limit caller)
   (let ((table (make-hash-table :test #'equal))
         (order '())
-        (current stream))
+        (current stream)
+        (count 0))
     (loop
       (let ((step (%stream-step current)))
         (when (eq step :end) (return (values table (nreverse order))))
+        (when (and limit (= count limit))
+          (%signal-stream-limit-exceeded caller limit))
         (let ((key (funcall key-function (car step))))
           (multiple-value-bind (existing present) (gethash key table)
             (unless present
               (push key order))
             (setf (gethash key table)
                   (funcall value-function existing present (car step)))))
+        (incf count)
         (setf current (cdr step))))))
 
-(defun stream-group-by (function stream)
+(defun stream-group-by (function stream &key limit)
   "Return an alist (KEY . ELEMENTS) grouping STREAM's elements by (FUNCALL FUNCTION
-ELEMENT). Keys appear in first-seen order and elements in stream order."
+ELEMENT). Keys appear in first-seen order and elements in stream order. LIMIT
+bounds the number of input elements accepted."
   (multiple-value-bind (table order)
       (%stream-group-into stream function
                           (lambda (existing present element)
                             (declare (ignore present))
-                            (cons element existing)))
+                            (cons element existing))
+                          limit
+                          "STREAM-GROUP-BY")
     (mapcar (lambda (key) (cons key (nreverse (gethash key table)))) order)))
 
-(defun stream-frequencies (stream &key (key #'identity))
+(defun stream-frequencies (stream &key (key #'identity) limit)
   "Return an alist (VALUE . COUNT) counting occurrences of (FUNCALL KEY ELEMENT)
-over STREAM, in first-seen order."
+over STREAM, in first-seen order. LIMIT bounds the number of input elements
+accepted."
   (multiple-value-bind (table order)
       (%stream-group-into stream key
                           (lambda (existing present element)
                             (declare (ignore element))
-                            (if present (1+ existing) 1)))
+                            (if present (1+ existing) 1))
+                          limit
+                          "STREAM-FREQUENCIES")
     (mapcar (lambda (value) (cons value (gethash value table))) order)))
 
-(defun stream-index-by (function stream)
+(defun stream-index-by (function stream &key limit)
   "Return an alist (KEY . ELEMENT) indexing STREAM by (FUNCALL FUNCTION ELEMENT),
-with the last element for each key winning. Keys appear in first-seen order."
+with the last element for each key winning. Keys appear in first-seen order.
+LIMIT bounds the number of input elements accepted."
   (multiple-value-bind (table order)
       (%stream-group-into stream function
                           (lambda (existing present element)
                             (declare (ignore existing present))
-                            element))
+                            element)
+                          limit
+                          "STREAM-INDEX-BY")
     (mapcar (lambda (key) (cons key (gethash key table))) order)))
 
 (defun stream-partition (predicate stream)
@@ -189,9 +215,10 @@ empty."
               remaining (1- remaining))))
     (values (nreverse head) current)))
 
-(defun stream-average (stream &key (key #'identity))
+(defun stream-average (stream &key (key #'identity) limit)
   "Return the arithmetic mean of (FUNCALL KEY ELEMENT) over STREAM, or NIL when
-STREAM is empty."
+STREAM is empty. LIMIT bounds the number of input elements accepted."
+  (%validate-stream-limit limit "STREAM-AVERAGE")
   (let ((sum 0)
         (count 0)
         (current stream))
@@ -199,6 +226,8 @@ STREAM is empty."
       (let ((step (%stream-step current)))
         (when (eq step :end)
           (return (if (zerop count) nil (/ sum count))))
+        (when (and limit (= count limit))
+          (%signal-stream-limit-exceeded "STREAM-AVERAGE" limit))
         (incf sum (funcall key (car step)))
         (incf count)
         (setf current (cdr step))))))

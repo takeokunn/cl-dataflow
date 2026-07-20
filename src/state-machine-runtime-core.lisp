@@ -25,7 +25,21 @@
             :detail "State machine requires STATE or INITIAL-STATE."))))
 
 (defun %copy-transition-history (history)
-  (copy-tree history))
+  (mapcar #'%copy-transition-record history))
+
+(defun %validate-state-machine-history-limit (limit)
+  (unless (or (null limit)
+              (and (integerp limit) (not (minusp limit))))
+    (error 'invalid-input-error
+           :expected '(or null unsigned-integer)
+           :value limit
+           :detail "STATE-MACHINE-HISTORY-LIMIT limit must be NIL or a non-negative integer."))
+  limit)
+
+(defun %trim-transition-history (history limit)
+  (if (and limit (< limit (length history)))
+      (subseq history 0 limit)
+      history))
 
 (defun %copy-state-transition (transition)
   (unless (state-transition-p transition)
@@ -41,17 +55,22 @@
                    :metadata (transition-metadata transition)))
 
 (defun %copy-transition-record (record)
-  (copy-tree record))
+  (%copy-structured-value record))
 
-(defun make-state-machine (&key state initial-state transitions history metadata)
+(defun make-state-machine (&key state initial-state transitions history history-limit metadata)
   (multiple-value-bind (resolved-state resolved-initial-state)
       (%resolve-state-machine-state state initial-state)
-    (make-instance 'state-machine
-                   :state resolved-state
-                   :initial-state resolved-initial-state
-                   :transitions (mapcar #'%copy-state-transition transitions)
-                   :history (%copy-transition-history history)
-                   :metadata (%normalize-metadata metadata))))
+    (let ((resolved-history-limit
+            (%validate-state-machine-history-limit history-limit)))
+      (make-instance 'state-machine
+                     :state resolved-state
+                     :initial-state resolved-initial-state
+                     :transitions (mapcar #'%copy-state-transition transitions)
+                     :history (%trim-transition-history
+                               (%copy-transition-history history)
+                               resolved-history-limit)
+                     :history-limit resolved-history-limit
+                     :metadata (%normalize-metadata metadata)))))
 
 (defmethod (setf state-machine-transitions) (transitions (machine state-machine))
   (setf (slot-value machine 'transitions)
@@ -69,6 +88,7 @@
                       :initial-state (state-machine-initial-state machine)
                       :transitions (%state-machine-transitions-list machine)
                       :history (%copy-transition-history (state-machine-history machine))
+                      :history-limit (state-machine-history-limit machine)
                       :metadata (%normalize-metadata (state-machine-metadata machine))))
 
 (defun reset-state-machine (machine)
@@ -113,8 +133,8 @@ instead of aborting the whole step."
 
 (defun %transition-error-detail (machine event-type &optional (detail "No transition"))
   (format nil "~A from ~A on event ~A" detail
-          (state-machine-state machine)
-          event-type))
+          (%escaped-display-string (state-machine-state machine))
+          (%escaped-display-string event-type)))
 
 (defun %guard-error-detail (machine event-type)
   (%transition-error-detail machine event-type "Guard rejected transition"))

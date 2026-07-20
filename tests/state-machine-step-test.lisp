@@ -54,6 +54,27 @@
                                     "start"
                                     "No transition from idle on event start")))
 
+(deftest state-machine-condition-details-escape-control-characters
+  (let* ((raw (format nil "spoof~%tab~Creturn~Cdel~Cend"
+                       #\Tab
+                       #\Return
+                       (code-char 127)))
+          (state (format nil "idle-~A" raw))
+          (event (format nil "start-~A" raw))
+          (machine (make-state-machine :state state :transitions '())))
+    (with-captured-condition (captured invalid-transition-error)
+        (step-state-machine machine event)
+      (let ((detail (invalid-transition-detail captured))
+            (report (condition-report-string captured)))
+        (is (search "\\n" detail))
+        (is (search "\\t" detail))
+        (is (search "\\r" detail))
+        (is (search "\\x7F;" detail))
+        (is (search "\\n" report))
+        (is (not (search (format nil "~%tab") detail)))
+        (is (not (search (format nil "~Creturn" #\Tab) detail)))
+        (is (not (search (format nil "~Cdel" #\Return) detail)))))))
+
 (deftest state-machine-action-override
   (with-idle-start-transition-machine (machine
                                        :action (lambda (machine event context)

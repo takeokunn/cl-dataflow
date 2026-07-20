@@ -44,15 +44,18 @@ transition record appended by the state machine (which leads with :FROM)."
         ((getf entry :effect) :effect)
         (t :transition)))
 
+(defun %trace-display-value (value)
+  (%escaped-display-string value))
+
 (defun %trace-entry-description (entry)
   (case (%trace-entry-kind entry)
-    (:node (format nil "node ~A" (getf entry :node)))
-    (:event (format nil "event ~A" (getf entry :event)))
-    (:effect (format nil "effect ~A" (getf entry :effect)))
+    (:node (format nil "node ~A" (%trace-display-value (getf entry :node))))
+    (:event (format nil "event ~A" (%trace-display-value (getf entry :event))))
+    (:effect (format nil "effect ~A" (%trace-display-value (getf entry :effect))))
     (t (format nil "transition ~A --~A--> ~A"
-               (getf entry :from)
-               (getf entry :event-type)
-               (getf entry :to)))))
+               (%trace-display-value (getf entry :from))
+               (%trace-display-value (getf entry :event-type))
+               (%trace-display-value (getf entry :to))))))
 
 (defun format-trace (context)
   "Return a human-readable, newline-terminated rendering of CONTEXT's trace in

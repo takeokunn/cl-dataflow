@@ -19,6 +19,19 @@
 (defun %copy-hash-table (table)
   (%copy-hash-table-with-value-transform table #'identity))
 
+(defun %escaped-display-string (value)
+  (with-output-to-string (out)
+    (loop for char across (princ-to-string value)
+          do (case char
+               (#\Newline (write-string "\\n" out))
+               (#\Return (write-string "\\r" out))
+               (#\Tab (write-string "\\t" out))
+               (t
+                (if (or (< (char-code char) 32)
+                        (= (char-code char) 127))
+                    (format out "\\x~2,'0X;" (char-code char))
+                    (write-char char out)))))))
+
 (defun %copy-structured-value* (value seen)
   (or (gethash value seen)
       (cond

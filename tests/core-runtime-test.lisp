@@ -252,6 +252,7 @@
     state-machine-initial-state
     state-machine-transitions
     state-machine-history
+    state-machine-history-limit
     state-machine-metadata
     make-state-machine
     copy-state-machine
@@ -266,12 +267,14 @@
     state-machine-states
     state-machine-event-types
     state-machine-reachable-states
-    state-machine-unreachable-states
-    state-machine-terminal-states
-    state-machine-deterministic-p
-    state-machine->dot
-    state-machine->mermaid
-    state-machine-run-states
+     state-machine-unreachable-states
+     state-machine-terminal-states
+     state-machine-deterministic-p
+     write-state-machine-dot
+     write-state-machine-mermaid
+     state-machine->dot
+     state-machine->mermaid
+     state-machine-run-states
     state-machine-accepts-p
     state-machine-event-path
     state-machine-to-plist
