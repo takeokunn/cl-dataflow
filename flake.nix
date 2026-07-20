@@ -51,7 +51,7 @@
       packages = forAllSystems (pkgs: {
         default = pkgs.stdenvNoCC.mkDerivation {
           pname = "cl-dataflow";
-          version = "0.1.0";
+          version = "0.2.0";
           src = sourceFor pkgs;
           dontBuild = true;
           installPhase = ''
