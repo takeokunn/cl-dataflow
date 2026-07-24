@@ -32,6 +32,8 @@
       stages
       :incoming-index
       (%incoming-edges-index graph)
+      :sinks
+      (%sink-nodes-in-order graph stages)
       :edge-signatures
       (loop for edge in (%graph-edges-list graph)
             collect (%make-pipeline-edge-signature edge))))
@@ -142,16 +144,16 @@
     (%record-node-run context node node-input bindings)
     (funcall continuation output)))
 
-(defun %finalize-pipeline-run (graph context order)
-  (setf (context-result context) (%collect-sink-results graph context order))
+(defun %finalize-pipeline-run (context sink-nodes)
+  (setf (context-result context) (%collect-cached-sink-results context sink-nodes))
   (context-result context))
 
 (defun %ensure-pipeline-context (context)
   (or context (make-context)))
 
-(defun %run-pipeline-stages/cps (context graph order input incoming-index continuation)
+(defun %run-pipeline-stages/cps (context graph order sink-nodes input incoming-index continuation)
   (labels ((advance-stages (remaining)
-              (if (endp remaining) (funcall continuation (%finalize-pipeline-run graph context order))
+              (if (endp remaining) (funcall continuation (%finalize-pipeline-run context sink-nodes))
           (%run-node/cps
             context
             graph
@@ -168,11 +170,13 @@
           (graph (%pipeline-execution-plan-graph plan))
           (ctx (%ensure-pipeline-context context))
           (order (%pipeline-execution-plan-stages plan))
+          (sink-nodes (%pipeline-execution-plan-sinks plan))
           (incoming-index (%pipeline-execution-plan-incoming-index plan)))
     (%run-pipeline-stages/cps
       ctx
       graph
       order
+      sink-nodes
       input
       incoming-index
       (lambda (result)

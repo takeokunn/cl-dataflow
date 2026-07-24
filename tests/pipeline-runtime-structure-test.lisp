@@ -212,6 +212,83 @@
       (is (eq plan (cl-dataflow::%pipeline-execution-plan pipeline))))))
 
 (deftest
+  pipeline-plan-caches-sinks-in-stage-order-using-full-graph-edges
+  (let* ((graph (make-graph))
+          (first (make-node "first"))
+          (second (make-node "second"))
+          (outside (make-node "outside")))
+    (dolist (node (list first second outside))
+      (add-node graph node))
+    (add-edge graph first outside)
+    (let* ((pipeline (make-pipeline :graph graph :stages (list second first)))
+            (plan (cl-dataflow::%pipeline-execution-plan pipeline))
+            (stages (cl-dataflow::%pipeline-execution-plan-stages plan))
+            (sinks (cl-dataflow::%pipeline-execution-plan-sinks plan)))
+      (is (equal (mapcar #'node-name sinks) '("second")))
+      (is (eq (first sinks) (first stages))))))
+
+(deftest
+  pipeline-plan-preserves-multiple-sink-result-order
+  (let* ((graph (make-graph))
+          (first
+        (make-node
+          "first"
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            1)))
+          (second
+        (make-node
+          "second"
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            2))))
+    (dolist (node (list first second))
+      (add-node graph node))
+    (let ((pipeline (make-pipeline :graph graph :stages (list second first))))
+      (is
+        (equal
+          (run-pipeline pipeline)
+          '(("second" ("value" . 2)) ("first" ("value" . 1))))))))
+
+(deftest
+  pipeline-rebuilds-cached-sinks-after-direct-edge-endpoint-mutation
+  (let* ((graph (make-graph))
+          (a
+        (make-node
+          "a"
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            1)))
+          (c
+        (make-node
+          "c"
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            3)))
+          (b
+        (make-node
+          "b"
+          :handler
+          (lambda (input context)
+            (declare (ignore context))
+            input))))
+    (dolist (node (list a c b))
+      (add-node graph node))
+    (add-edge graph a b)
+    (let* ((pipeline (make-pipeline :graph graph :stages (list a c b)))
+            (live-graph (pipeline-graph pipeline))
+            (edge (first (cl-dataflow::%graph-edges-list live-graph)))
+            (old-plan (cl-dataflow::%pipeline-execution-plan pipeline)))
+      (is (equal (run-pipeline pipeline) '(("c" ("value" . 3)) ("b" ("value" . 1)))))
+      (setf (edge-from edge) "c")
+      (is (equal (run-pipeline pipeline) '(("a" ("value" . 1)) ("b" ("value" . 3)))))
+      (is (not (eq old-plan (cl-dataflow::%pipeline-execution-plan pipeline)))))))
+
+(deftest
   pipeline-rebuilds-plan-after-live-edge-mutation
   (with-linear-test-pipeline
     (graph pipeline source sink)

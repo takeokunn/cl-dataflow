@@ -5,17 +5,14 @@
     (cond
       ((null outputs) '())
       ((%single-output-scalar-result-p outputs result)
-       (%scalar-output-binding outputs result))
+        (%scalar-output-binding outputs result))
       (t (%normalize-output-structure result outputs)))))
 
 (defun %binding-list-p (value)
-  (and (listp value)
-       (or (null value)
-           (every #'consp value))))
+  (and (listp value) (or (null value) (every #'consp value))))
 
 (defun %single-output-scalar-result-p (outputs result)
-  (and (= (length outputs) 1)
-       (not (%binding-list-p result))))
+  (and (= (length outputs) 1) (not (%binding-list-p result))))
 
 (defun %scalar-output-binding (outputs result)
   (list (cons (first outputs) result)))
@@ -24,9 +21,8 @@
   (%normalize-structured-input input (%node-inputs-list node)))
 
 (defun %collapse-single-binding-list (bindings)
-  (if (= (length bindings) 1)
-      (cdar bindings)
-      bindings))
+  (if (= (length bindings) 1) (cdar bindings)
+    bindings))
 
 (defun %edge-binding-table (incoming-edges)
   "Map each input port to the edge that feeds it. INCOMING-EDGES is newest-first
@@ -45,34 +41,28 @@ insertion order silently deciding it the other way."
       (dolist (port (%node-inputs-list node) (nreverse bindings))
         (let ((edge (gethash port binding-table)))
           (when edge
-            (push (cons port
-                        (%read-value context
-                                     (edge-from edge)
-                                     (edge-from-port edge)))
-                  bindings)))))))
+            (push
+              (cons port (%read-value context (edge-from edge) (edge-from-port edge)))
+              bindings)))))))
 
 (defun %collect-node-inputs (context graph node input &optional incoming-index)
-  (let ((incoming (if incoming-index
-                       (gethash (node-name node) incoming-index)
-                       (%incoming-edges graph (node-name node)))))
-    (if incoming
-        (%collapse-single-binding-list
-         (%incoming-edge-bindings context node incoming))
-        (%node-input-binding node input))))
+  (let ((incoming
+        (if incoming-index (gethash (node-name node) incoming-index)
+          (%incoming-edges graph (node-name node)))))
+    (if incoming (%collapse-single-binding-list (%incoming-edge-bindings context node incoming))
+      (%node-input-binding node input))))
 
 (defun %sink-output-bindings (context node)
   (loop for port in (%node-outputs-list node)
         collect (cons port (%read-value context (node-name node) port))))
 
 (defun %sink-result-entry (context node)
-  (cons (node-name node)
-        (%sink-output-bindings context node)))
+  (cons (node-name node) (%sink-output-bindings context node)))
 
 (defun %collapse-single-sink-result (sink-entry)
   (let ((values (cdr sink-entry)))
-    (if (= (length values) 1)
-        (cdar values)
-        values)))
+    (if (= (length values) 1) (cdar values)
+      values)))
 
 (defun %sink-nodes-in-order (graph order)
   ;; Sinks are the nodes with no outgoing edge. Deriving them from one adjacency
@@ -80,15 +70,19 @@ insertion order silently deciding it the other way."
   ;; predicate rebuilt the whole Prolog rulebase for every node in ORDER.
   (let ((successors (%graph-adjacency graph (%graph-rulebase graph))))
     (remove-if-not (lambda (node)
-                     (null (gethash (node-name node) successors)))
-                   order)))
+                      (null (gethash (node-name node) successors)))
+                    order)))
 
-(defun %collect-sink-results (graph context order)
-  (let ((sinks (mapcar (lambda (node)
-                         (%sink-result-entry context node))
-                       (%sink-nodes-in-order graph order))))
+(defun %collect-cached-sink-results (context sink-nodes)
+  (let ((sinks
+        (mapcar
+          (lambda (node)
+            (%sink-result-entry context node))
+          sink-nodes)))
     (cond
       ((null sinks) nil)
-      ((= (length sinks) 1)
-       (%collapse-single-sink-result (first sinks)))
+      ((= (length sinks) 1) (%collapse-single-sink-result (first sinks)))
       (t sinks))))
+
+(defun %collect-sink-results (graph context order)
+  (%collect-cached-sink-results context (%sink-nodes-in-order graph order)))
