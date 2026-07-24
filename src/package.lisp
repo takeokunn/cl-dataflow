@@ -1,3 +1,7 @@
+;;;; The single public package this library exports everything through:
+;;;; graphs and nodes, pipelines, events, effects, state machines, streams,
+;;;; reactive subjects, and their shared condition types.
+
 (defpackage #:cl-dataflow
   (:use #:cl)
   (:export
@@ -399,13 +403,3 @@
     #:assert-state-machine-state
     #:assert-pipeline-result))
 
-(in-package #:cl-dataflow)
-
-(defmacro %load-fragment (pathname)
-  (let ((source-directory
-          (make-pathname :name nil
-                          :type nil
-                          :defaults (or *compile-file-pathname*
-                                        *load-truename*))))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-        (load (merge-pathnames ,pathname ,source-directory)))))
