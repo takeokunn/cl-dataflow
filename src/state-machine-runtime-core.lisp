@@ -70,16 +70,48 @@
       (make-instance 'state-machine
                      :state resolved-state
                      :initial-state resolved-initial-state
-                     :transitions (mapcar #'%copy-state-transition transitions)
+                     :transitions transitions
                      :history (%trim-transition-history
                                (%copy-transition-history history)
                                resolved-history-limit)
                      :history-limit resolved-history-limit
                      :metadata (%normalize-metadata metadata)))))
 
+(defun %make-state-machine-transition-index (transitions)
+  "Build the FROM-state -> event-type -> transitions lookup MACHINE selects on.
+Both levels are EQUALP hash tables (case-insensitive string keys, matching the
+old STRING-EQUAL scan), and each candidate list preserves definition order so
+guard fall-through still picks the first satisfied transition."
+  (let ((index (make-hash-table :test 'equalp)))
+    (dolist (transition transitions)
+      (let* ((from-key (copy-seq (string (transition-from transition))))
+             (event-key (copy-seq (string (transition-event-type transition))))
+             (event-index (or (gethash from-key index)
+                              (setf (gethash from-key index)
+                                    (make-hash-table :test 'equalp)))))
+        (push transition (gethash event-key event-index))))
+    (maphash (lambda (from-key event-index)
+               (declare (ignore from-key))
+               (maphash (lambda (event-key candidates)
+                          (setf (gethash event-key event-index) (nreverse candidates)))
+                        event-index))
+             index)
+    index))
+
+(defun %reindex-state-machine-transitions (machine transitions)
+  "Store a freshly-copied TRANSITIONS list on MACHINE together with its lookup
+index, keeping the two slots in lock-step."
+  (let ((copied (mapcar #'%copy-state-transition transitions)))
+    (setf (slot-value machine 'transitions) copied
+          (slot-value machine 'transition-index)
+          (%make-state-machine-transition-index copied))))
+
+(defmethod initialize-instance :after ((machine state-machine) &key)
+  (%reindex-state-machine-transitions machine (slot-value machine 'transitions)))
+
 (defmethod (setf state-machine-transitions) (transitions (machine state-machine))
-  (setf (slot-value machine 'transitions)
-        (mapcar #'%copy-state-transition transitions)))
+  (%reindex-state-machine-transitions machine transitions)
+  transitions)
 
 (defmethod state-machine-transitions ((machine state-machine))
   (mapcar #'%copy-state-transition
@@ -111,9 +143,14 @@
     (event (event-type event))
     (t (%normalize-name event))))
 
-(defun %transition-matches-p (transition machine event-type)
-  (and (string-equal (transition-from transition) (state-machine-state machine))
-       (string-equal (transition-event-type transition) event-type)))
+(defun %indexed-matching-transitions (machine event-type)
+  "Every transition whose FROM state and EVENT-TYPE match MACHINE's current state,
+in definition order, read from the precomputed transition index in O(1) rather
+than scanning the whole transition list."
+  (let ((event-index (gethash (string (state-machine-state machine))
+                              (slot-value machine 'transition-index))))
+    (when event-index
+      (gethash (string event-type) event-index))))
 
 (defun %transition-guard-satisfied-p (transition machine event context)
   (let ((guard (transition-guard transition)))
@@ -123,12 +160,11 @@
 (defun %find-transition-selection (machine event context event-type)
   "Return selected transition and the first matching transition, if any."
   (loop with first-match = nil
-        for transition in (%state-machine-transitions-list machine)
-        when (%transition-matches-p transition machine event-type)
-          do (when (%transition-guard-satisfied-p transition machine event context)
-               (return (values transition transition)))
-             (unless first-match
-               (setf first-match transition))
+        for transition in (%indexed-matching-transitions machine event-type)
+        do (when (%transition-guard-satisfied-p transition machine event context)
+             (return (values transition transition)))
+           (unless first-match
+             (setf first-match transition))
         finally (return (values nil first-match))))
 
 (defun %transition-error-detail (machine event-type &optional (detail "No transition"))

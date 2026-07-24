@@ -11,30 +11,28 @@
   (make-hash-table :test #'equal))
 
 (defun %copy-hash-table-with-value-transform (table value-transform)
-  (let ((copy (make-hash-table :test (hash-table-test table)
-                               :size (hash-table-count table))))
-    (maphash (lambda (key value)
-               (setf (gethash key copy)
-                     (funcall value-transform value)))
-             table)
+  (let ((copy
+        (make-hash-table :test (hash-table-test table) :size (hash-table-count table))))
+    (maphash
+      (lambda (key value)
+        (setf (gethash key copy) (funcall value-transform value)))
+      table)
     copy))
 
 (defmacro define-copy-hash-table (name (source element-copy))
   `(defun ,name (,source)
-     (%copy-hash-table-with-value-transform ,source ,element-copy)))
+    (%copy-hash-table-with-value-transform ,source ,element-copy)))
 
 (defun %escaped-display-string (value)
   (with-output-to-string (out)
     (loop for char across (princ-to-string value)
           do (case char
-               (#\Newline (write-string "\\n" out))
-               (#\Return (write-string "\\r" out))
-               (#\Tab (write-string "\\t" out))
-               (t
-                (if (or (< (char-code char) 32)
-                        (= (char-code char) 127))
-                    (format out "\\x~2,'0X;" (char-code char))
-                    (write-char char out)))))))
+        (#\Newline (write-string "\\n" out))
+        (#\Return (write-string "\\r" out))
+        (#\Tab (write-string "\\t" out))
+        (t
+          (if (or (< (char-code char) 32) (= (char-code char) 127)) (format out "\\x~2,'0X;" (char-code char))
+            (write-char char out)))))))
 
 (defstruct (%copy-bounce (:constructor %make-copy-bounce (thunk)))
   "A deferred continuation for %COPY-STRUCTURED-VALUE/CPS's trampoline: calling
@@ -101,15 +99,24 @@ by branching depth rather than an unbounded chain, so it stays safe."
   (%run-copy-trampoline (%copy-structured-value/cps value seen #'identity)))
 
 (defun %copy-structured-value (value)
-  (%copy-structured-value* value (make-hash-table :test #'eq)))
+  (if (or (consp value) (hash-table-p value) (stringp value) (vectorp value)) (%copy-structured-value* value (make-hash-table :test #'eq))
+    value))
 
 (defun %copy-result-table (table)
-  (%copy-hash-table-with-value-transform table #'%copy-structured-value))
+  (let ((copy
+        (make-hash-table :test (hash-table-test table) :size (hash-table-count table))))
+    (maphash
+      (lambda (key value)
+        (setf
+          (gethash (%copy-structured-value key) copy)
+          (%copy-structured-value value)))
+      table)
+    copy))
 
 (defun %copy-effect-handlers (effect-handlers)
-  (let ((copy (make-hash-table :test #'equal
-                               :size (hash-table-count effect-handlers))))
-    (maphash (lambda (key value)
-               (setf (gethash (%normalize-handler-key key) copy) value))
-             effect-handlers)
+  (let ((copy (make-hash-table :test #'equal :size (hash-table-count effect-handlers))))
+    (maphash
+      (lambda (key value)
+        (setf (gethash (%normalize-handler-key key) copy) value))
+      effect-handlers)
     copy))

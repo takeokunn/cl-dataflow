@@ -13,13 +13,30 @@ each source value V produces and emits (FUNCALL FUNCTION ACCUMULATOR V)."
   (setf accumulator (funcall function accumulator value))
   (emit accumulator))
 
-(define-subject-operator subject-distinct (subject &key (test 'equal))
-  "Return a derived subject that re-emits only values not previously emitted (under
-TEST). Runs in O(n) membership per emission."
-  (:state (seen '()))
-  (unless (member value seen :test test)
-    (push value seen)
-    (emit value)))
+(defun subject-distinct (subject &key (test 'equal))
+  "Return a derived subject that re-emits only the first occurrence of each value
+(per TEST). Standard test designators use hash lookup where equality is
+mutation-stable; custom predicates and structural EQUAL/EQUALP values retain
+O(n) MEMBER semantics. Hand-written rather than a DEFINE-SUBJECT-OPERATOR form
+so the hash fast-path can hold its own membership state."
+  (let* ((result (make-subject))
+         (standard-test (%standard-distinct-test test))
+         (hashed-seen (and standard-test (make-hash-table :test standard-test)))
+         (seen '()))
+    (subject-subscribe
+     subject
+     (lambda (value)
+       (let ((hashable (%distinct-hashable-value-p standard-test value)))
+         (if hashable
+             (multiple-value-bind (present-value present-p) (gethash value hashed-seen)
+               (declare (ignore present-value))
+               (unless present-p
+                 (setf (gethash value hashed-seen) t)
+                 (subject-emit result value)))
+             (unless (member value seen :test test)
+               (push value seen)
+               (subject-emit result value))))))
+    result))
 
 (define-subject-operator subject-tap (subject function)
   "Return a derived subject that calls FUNCTION on each source value for its side
@@ -45,53 +62,63 @@ until their counterpart arrives."
         (queue-b '())
         (tail-b '()))
     (flet ((enqueue-a (value)
-             (let ((cell (list value)))
-               (if queue-a
-                   (setf (rest tail-a) cell
-                         tail-a cell)
-                   (setf queue-a cell
-                         tail-a cell))))
-           (enqueue-b (value)
-             (let ((cell (list value)))
-               (if queue-b
-                   (setf (rest tail-b) cell
-                         tail-b cell)
-                   (setf queue-b cell
-                         tail-b cell))))
-           (emit-if-ready ()
-             (when (and queue-a queue-b)
-               (let ((value-a (first queue-a))
-                     (value-b (first queue-b)))
-                 (setf queue-a (rest queue-a)
-                       queue-b (rest queue-b))
-                 (unless queue-a
-                   (setf tail-a '()))
-                 (unless queue-b
-                   (setf tail-b '()))
-                 (subject-emit result (cons value-a value-b))))))
-      (subject-subscribe subject-a
-                         (lambda (value)
-                           (enqueue-a value)
-                           (emit-if-ready)))
-      (subject-subscribe subject-b
-                         (lambda (value)
-                           (enqueue-b value)
-                           (emit-if-ready))))
+              (let ((cell (list value)))
+            (if queue-a (setf (rest tail-a) cell
+                    tail-a cell)
+              (setf queue-a cell
+                    tail-a cell))))
+            (enqueue-b (value)
+              (let ((cell (list value)))
+            (if queue-b (setf (rest tail-b) cell
+                    tail-b cell)
+              (setf queue-b cell
+                    tail-b cell))))
+            (emit-if-ready ()
+              (when (and queue-a queue-b)
+            (let ((value-a (first queue-a))
+                  (value-b (first queue-b)))
+              (setf queue-a (rest queue-a)
+                    queue-b (rest queue-b))
+              (unless queue-a
+                (setf tail-a '()))
+              (unless queue-b
+                (setf tail-b '()))
+              (subject-emit result (cons value-a value-b))))))
+      (subject-subscribe
+        subject-a
+        (lambda (value)
+          (enqueue-a value)
+          (emit-if-ready)))
+      (subject-subscribe
+        subject-b
+        (lambda (value)
+          (enqueue-b value)
+          (emit-if-ready))))
     result))
 
 (defun subject-combine-latest (subject-a subject-b)
   "Return a derived subject that emits (LATEST-A . LATEST-B) whenever either source
 emits, once both have emitted at least once."
   (let ((result (make-subject))
-        (latest-a nil) (has-a nil)
-        (latest-b nil) (has-b nil))
+        (latest-a nil)
+        (has-a nil)
+        (latest-b nil)
+        (has-b nil))
     (flet ((emit-combined ()
-             (when (and has-a has-b)
-               (subject-emit result (cons latest-a latest-b)))))
-      (subject-subscribe subject-a
-                         (lambda (value) (setf latest-a value has-a t) (emit-combined)))
-      (subject-subscribe subject-b
-                         (lambda (value) (setf latest-b value has-b t) (emit-combined))))
+              (when (and has-a has-b)
+            (subject-emit result (cons latest-a latest-b)))))
+      (subject-subscribe
+        subject-a
+        (lambda (value)
+          (setf latest-a value
+                has-a t)
+          (emit-combined)))
+      (subject-subscribe
+        subject-b
+        (lambda (value)
+          (setf latest-b value
+                has-b t)
+          (emit-combined))))
     result))
 
 (define-subject-operator subject-buffer (subject n)
@@ -144,11 +171,11 @@ values by PREDICATE -- each value is emitted on MATCHING when PREDICATE holds, a
 on NON-MATCHING otherwise."
   (let ((matching (make-subject))
         (non-matching (make-subject)))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (if (funcall predicate value)
-                             (subject-emit matching value)
-                             (subject-emit non-matching value))))
+    (subject-subscribe
+      subject
+      (lambda (value)
+        (if (funcall predicate value) (subject-emit matching value)
+          (subject-emit non-matching value))))
     (values matching non-matching)))
 
 (define-subject-operator subject-count (subject)

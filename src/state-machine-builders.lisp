@@ -4,37 +4,52 @@
 ;;;; mutation/relabelling. Serialisation round-trips structure through plists;
 ;;;; guards and actions are runtime closures and are not serialised. Mutators keep
 ;;;; transitions normalised and copied exactly as MAKE-STATE-MACHINE does.
-
 (defun %transition-plist (transition)
-  (list :from (transition-from transition)
-        :event-type (transition-event-type transition)
-        :to (transition-to transition)
-        :metadata (transition-metadata transition)))
+  (list
+    :from
+    (transition-from transition)
+    :event-type
+    (transition-event-type transition)
+    :to
+    (transition-to transition)
+    :metadata
+    (transition-metadata transition)))
 
 (defun state-machine-to-plist (machine)
   "Serialise MACHINE's structure to a plist
   (:state ... :initial-state ... :metadata ... :transitions (transition-plist ...)).
 Guards and actions are runtime closures and are NOT serialised, so a round trip
 preserves states, events, targets, and metadata but not guarded behaviour."
-  (list :state (state-machine-state machine)
-        :initial-state (state-machine-initial-state machine)
-        :metadata (state-machine-metadata machine)
-        :transitions (mapcar #'%transition-plist
-                             (state-machine-transitions machine))))
+  (list
+    :state
+    (state-machine-state machine)
+    :initial-state
+    (state-machine-initial-state machine)
+    :metadata
+    (state-machine-metadata machine)
+    :transitions
+    (mapcar #'%transition-plist (state-machine-transitions machine))))
 
 (defun plist-to-state-machine (plist)
   "Rebuild a state machine from a plist produced by STATE-MACHINE-TO-PLIST.
 Reconstructed transitions have no guard or action."
   (make-state-machine
-   :state (getf plist :state)
-   :initial-state (getf plist :initial-state)
-   :metadata (getf plist :metadata)
-   :transitions (mapcar (lambda (transition-plist)
-                          (make-transition (getf transition-plist :from)
-                                           (getf transition-plist :event-type)
-                                           (getf transition-plist :to)
-                                           :metadata (getf transition-plist :metadata)))
-                        (getf plist :transitions))))
+    :state
+    (getf plist :state)
+    :initial-state
+    (getf plist :initial-state)
+    :metadata
+    (getf plist :metadata)
+    :transitions
+    (mapcar
+      (lambda (transition-plist)
+        (make-transition
+          (getf transition-plist :from)
+          (getf transition-plist :event-type)
+          (getf transition-plist :to)
+          :metadata
+          (getf transition-plist :metadata)))
+      (getf plist :transitions))))
 
 (defun state-machine-complete-p (machine)
   "Return true when MACHINE defines a transition for every (state, event-type)
@@ -42,10 +57,9 @@ pair -- i.e. its transition relation is total over its states and events. A mach
 with no events is vacuously complete."
   (let ((defined (make-hash-table :test #'equal)))
     (dolist (transition (%state-machine-transitions-list machine))
-      (setf (gethash (cons (transition-from transition)
-                           (transition-event-type transition))
-                     defined)
-            t))
+      (setf (gethash
+          (cons (transition-from transition) (transition-event-type transition))
+          defined) t))
     (block done
       (dolist (state (state-machine-states machine) t)
         (dolist (event (state-machine-event-types machine))
@@ -57,10 +71,13 @@ with no events is vacuously complete."
 or NIL when none matches. The result is an independent copy."
   (let ((normalized-state (%normalize-name state))
         (normalized-event (%normalize-name event-type)))
-    (let ((transition (find-if (lambda (transition)
-                                 (and (string-equal (transition-from transition) normalized-state)
-                                      (string-equal (transition-event-type transition) normalized-event)))
-                               (%state-machine-transitions-list machine))))
+    (let ((transition
+          (find-if
+            (lambda (transition)
+              (and
+                (string-equal (transition-from transition) normalized-state)
+                (string-equal (transition-event-type transition) normalized-event)))
+            (%state-machine-transitions-list machine))))
       (when transition
         (%copy-state-transition transition)))))
 
@@ -68,10 +85,19 @@ or NIL when none matches. The result is an independent copy."
   "Append a transition FROM --EVENT-TYPE--> TO to MACHINE, in place, and return
 MACHINE. Because guard selection picks the first matching transition, appended
 transitions act as lower-priority fallbacks relative to existing ones."
-  (setf (slot-value machine 'transitions)
-        (append (slot-value machine 'transitions)
-                (list (make-transition from event-type to
-                                       :guard guard :action action :metadata metadata))))
+  (setf (state-machine-transitions machine) (append
+      (slot-value machine (quote transitions))
+      (list
+        (make-transition
+          from
+          event-type
+          to
+          :guard
+          guard
+          :action
+          action
+          :metadata
+          metadata))))
   machine)
 
 (defun %transition-key (from event-type to)
@@ -80,16 +106,20 @@ transitions act as lower-priority fallbacks relative to existing ones."
 (defun remove-transition (machine from event-type to)
   "Remove every transition FROM --EVENT-TYPE--> TO from MACHINE, in place, and
 return MACHINE."
-  (let ((target (%transition-key (%normalize-name from)
-                                 (%normalize-name event-type)
-                                 (%normalize-name to))))
-    (setf (slot-value machine 'transitions)
-          (remove-if (lambda (transition)
-                       (string= target
-                                (%transition-key (transition-from transition)
-                                                 (transition-event-type transition)
-                                                 (transition-to transition))))
-                     (slot-value machine 'transitions)))
+  (let ((target
+        (%transition-key
+          (%normalize-name from)
+          (%normalize-name event-type)
+          (%normalize-name to))))
+    (setf (state-machine-transitions machine) (remove-if
+        (lambda (transition)
+          (string=
+            target
+            (%transition-key
+              (transition-from transition)
+              (transition-event-type transition)
+              (transition-to transition))))
+        (slot-value machine (quote transitions))))
     machine))
 
 (defun state-machine->graph (machine)
@@ -107,11 +137,8 @@ states collapse to a single edge; a self-transition becomes a self-loop."
       (let ((key (cons (transition-from transition) (transition-to transition))))
         (unless (gethash key seen)
           (setf (gethash key seen) t)
-          (let ((edge (add-edge graph
-                                (transition-from transition)
-                                (transition-to transition))))
-            (setf (edge-metadata edge)
-                  (list :event (transition-event-type transition)))))))
+          (let ((edge (add-edge graph (transition-from transition) (transition-to transition))))
+            (setf (edge-metadata edge) (list :event (transition-event-type transition)))))))
     graph))
 
 (defun state-machine-relabel-state (machine old-state new-state)
@@ -121,16 +148,26 @@ endpoint). Guards and actions are carried over unchanged; MACHINE is not modifie
   (let ((old (%normalize-name old-state))
         (new (%normalize-name new-state)))
     (flet ((relabel (state)
-             (if (string= state old) new state)))
+              (if (string= state old) new
+            state)))
       (make-state-machine
-       :state (relabel (state-machine-state machine))
-       :initial-state (relabel (state-machine-initial-state machine))
-       :metadata (state-machine-metadata machine)
-       :transitions (mapcar (lambda (transition)
-                              (make-transition (relabel (transition-from transition))
-                                               (transition-event-type transition)
-                                               (relabel (transition-to transition))
-                                               :guard (transition-guard transition)
-                                               :action (transition-action transition)
-                                               :metadata (transition-metadata transition)))
-                            (%state-machine-transitions-list machine))))))
+        :state
+        (relabel (state-machine-state machine))
+        :initial-state
+        (relabel (state-machine-initial-state machine))
+        :metadata
+        (state-machine-metadata machine)
+        :transitions
+        (mapcar
+          (lambda (transition)
+            (make-transition
+              (relabel (transition-from transition))
+              (transition-event-type transition)
+              (relabel (transition-to transition))
+              :guard
+              (transition-guard transition)
+              :action
+              (transition-action transition)
+              :metadata
+              (transition-metadata transition)))
+          (%state-machine-transitions-list machine))))))

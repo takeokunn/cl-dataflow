@@ -24,20 +24,26 @@
   (subject-count-emits-running-total
    (lambda (s) (subject-count s)) (:a :b :c) (1 2 3)))
 
-(deftest subject-tap-observes-without-changing
+(deftest
+  subject-tap-observes-without-changing
   (let* ((source (make-subject))
-         (seen '())
-         (tapped (subject-tap source (lambda (v) (push v seen))))
-         (collector (subject-collect tapped)))
-    (dolist (value '(1 2 3)) (subject-emit source value))
+          (seen '())
+          (tapped
+        (subject-tap
+          source
+          (lambda (v)
+            (push v seen))))
+          (collector (subject-collect tapped)))
+    (dolist (value '(1 2 3))
+      (subject-emit source value))
     (is (equal (funcall collector) '(1 2 3)))
     (is (equal (nreverse seen) '(1 2 3)))))
 
 (deftest subject-zip-pairs-in-lockstep
   (let* ((a (make-subject))
-         (b (make-subject))
-         (zipped (subject-zip a b))
-         (collector (subject-collect zipped)))
+          (b (make-subject))
+          (zipped (subject-zip a b))
+          (collector (subject-collect zipped)))
     (subject-emit a 1)     ; queued, b empty -> nothing yet
     (subject-emit a 2)     ; queued
     (subject-emit b 10)    ; pairs with 1
@@ -50,9 +56,9 @@
 
 (deftest subject-combine-latest-tracks-both
   (let* ((a (make-subject))
-         (b (make-subject))
-         (combined (subject-combine-latest a b))
-         (collector (subject-collect combined)))
+          (b (make-subject))
+          (combined (subject-combine-latest a b))
+          (collector (subject-collect combined)))
     (subject-emit a 1)     ; b not seen yet -> nothing
     (subject-emit b 10)    ; -> (1 . 10)
     (subject-emit a 2)     ; -> (2 . 10)
@@ -61,8 +67,8 @@
 
 (deftest subject-buffer-groups-fixed-batches
   (let* ((source (make-subject))
-         (batches (subject-buffer source 2))
-         (collector (subject-collect batches)))
+          (batches (subject-buffer source 2))
+          (collector (subject-collect batches)))
     (dolist (value '(1 2 3 4 5)) (subject-emit source value))
     ;; (1 2) and (3 4); the trailing 5 stays buffered.
     (is (equal (funcall collector) '((1 2) (3 4))))
@@ -70,10 +76,10 @@
 
 (deftest subject-flat-map-forwards-inner-emissions
   (let* ((source (make-subject))
-         (inner-a (make-subject))
-         (inner-b (make-subject))
-         (flattened (subject-flat-map source (lambda (v) (if (eq v :a) inner-a inner-b))))
-         (collector (subject-collect flattened)))
+          (inner-a (make-subject))
+          (inner-b (make-subject))
+          (flattened (subject-flat-map source (lambda (v) (if (eq v :a) inner-a inner-b))))
+          (collector (subject-collect flattened)))
     (subject-emit source :a)   ; subscribe to inner-a
     (subject-emit source :b)   ; subscribe to inner-b
     (subject-emit inner-a 1)
@@ -81,12 +87,14 @@
     (subject-emit inner-a 3)
     (is (equal (funcall collector) '(1 2 3)))))
 
-(deftest subject-partition-splits-by-predicate
+(deftest
+  subject-partition-splits-by-predicate
   (let ((source (make-subject)))
     (multiple-value-bind (evens odds) (subject-partition source #'evenp)
       (let ((even-log (subject-collect evens))
             (odd-log (subject-collect odds)))
-        (dolist (value '(1 2 3 4 5 6)) (subject-emit source value))
+        (dolist (value '(1 2 3 4 5 6))
+          (subject-emit source value))
         (is (equal (funcall even-log) '(2 4 6)))
         (is (equal (funcall odd-log) '(1 3 5)))))))
 
@@ -120,3 +128,42 @@
     (is (eq (second expansion) 'demo))
     (is (equal (third expansion) '(source factor)))
     (is (equal (fourth expansion) "Scale each value."))))
+
+;;; SUBJECT-DISTINCT is hand-written (not a DEFINE-SUBJECT-OPERATOR form) so it
+;;; can use a hash fast-path for standard test designators; these cover the
+;;; fast path, the custom-predicate fallback, and the mutable-EQUAL fallback.
+
+(deftest subject-distinct-accepts-standard-function-designators
+  (dolist (test (list 'eql #'eql 'equalp #'equalp))
+    (let* ((source (make-subject))
+           (collector (subject-collect (subject-distinct source :test test))))
+      (dolist (value (list 1 1.0 2 2.0))
+        (subject-emit source value))
+      (is (equal (funcall collector)
+                 (if (member test (list 'equalp #'equalp) :test #'eq)
+                     (list 1 2)
+                     (list 1 1.0 2 2.0)))))))
+
+(deftest subject-distinct-preserves-custom-test-exploration
+  (let* ((calls '())
+         (source (make-subject))
+         (collector (subject-collect
+                     (subject-distinct
+                      source
+                      :test (lambda (candidate existing)
+                              (push (list candidate existing) calls)
+                              (eql candidate existing))))))
+    (dolist (value '(1 2 1))
+      (subject-emit source value))
+    (is (equal (funcall collector) '(1 2)))
+    (is (equal (nreverse calls) '((2 1) (1 2) (1 1))))))
+
+(deftest subject-distinct-retains-mutable-equal-semantics
+  (let* ((value (copy-seq "a"))
+         (source (make-subject))
+         (collector (subject-collect (subject-distinct source :test 'equal))))
+    (subject-emit source value)
+    (setf (char value 0) #\b)
+    (subject-emit source "a")
+    (subject-emit source "b")
+    (is (equal (funcall collector) (list "b" "a")))))
