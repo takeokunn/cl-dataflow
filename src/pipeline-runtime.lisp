@@ -41,9 +41,10 @@
   (defun %pipeline-output-key-plan (signature)
     (let ((outputs (%pipeline-stage-signature-outputs signature))
           (name (%pipeline-stage-signature-name signature)))
-      (cons outputs
-            (loop for port in outputs
-                  collect (cons port (%pipeline-value-key name port))))))
+      (cons
+        outputs
+        (loop for port in outputs
+              collect (cons port (%pipeline-value-key name port))))))
   (defun %pipeline-input-key-plan (binding-plan target-signature edge-signatures)
     (cons
       (car binding-plan)
@@ -69,8 +70,7 @@
     (loop for signature in stage-signatures
           for output-key-plan in output-key-plans
           when (eq sink (%pipeline-stage-signature-node signature))
-            return (cons (%pipeline-stage-signature-name signature)
-                          (cdr output-key-plan))))
+            return (cons (%pipeline-stage-signature-name signature) (cdr output-key-plan))))
   (defun %make-pipeline-execution-plan (graph stages)
     (let* ((incoming-index (%incoming-edges-index graph))
             (stage-signatures
@@ -243,10 +243,19 @@
               (%node-input-binding node input)))
           ((null (cdr bindings)) (%read-value-by-key context (cdar bindings)))
           (t (%collapse-single-binding-list (%resolve-input-key-plan context bindings)))))
-          (output (funcall (node-handler node) node-input context))
-          (output-bindings
-        (%node-output-bindings node output output-names)))
-    (%record-node-run context node node-input output-bindings output-key-plan)
+          (output (funcall (node-handler node) node-input context)))
+    (if (%single-output-scalar-result-p output-names output)
+        (let ((output-name (caar output-key-plan)))
+          (%store-value-by-key context (cdar output-key-plan) output)
+          (%push-context-trace-entry
+            context
+            (list :node (node-name node)
+                  :input node-input
+                  :output (list (cons output-name (%copy-structured-value output))))))
+        (%record-node-run
+          context node node-input
+          (%node-output-bindings node output output-names)
+          output-key-plan))
     output))
 
 (defun %finalize-pipeline-run (context sink-result-plans)

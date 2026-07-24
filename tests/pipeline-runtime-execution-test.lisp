@@ -19,6 +19,49 @@
     (assert-context-first-trace-entry context (:output '(("items" . (1 2)))))))
 
 (deftest
+  pipeline-single-scalar-fast-path-preserves-raw-trace-input-identity
+  (let* ((pipeline-input (vector :payload))
+          (handler-input nil)
+          (stage
+            (make-node
+              "source"
+              :inputs '("input")
+              :outputs '("value")
+              :handler
+              (lambda (input context)
+                (declare (ignore context))
+                (setf handler-input input)
+                :ok)))
+          (context
+            (run-pipeline-with-test-context
+              (make-pipeline :stages (list stage)) :input pipeline-input))
+          (raw-trace (first (cl-dataflow::%context-trace-list context))))
+    (is (eq handler-input pipeline-input))
+    (is (eq (getf raw-trace :input) handler-input))))
+
+(deftest
+  pipeline-single-output-binding-list-uses-normalization-fallback
+  (let* ((payload (list 1 2))
+          (stage
+            (make-node
+              "source"
+              :outputs '("items")
+              :handler
+              (lambda (input context)
+                (declare (ignore input context))
+                (list (cons "items" payload)))))
+          (context
+            (run-pipeline-with-test-context
+              (make-pipeline :stages (list stage)) :input nil))
+          (stored (context-value context "source" "items"))
+          (traced (cdar (getf (first (context-trace context)) :output))))
+    (is (equal stored '(1 2)))
+    (is (equal traced '(1 2)))
+    (is (not (eq payload stored)))
+    (is (not (eq payload traced)))
+    (is (not (eq stored traced)))))
+
+(deftest
   pipeline-plan-preserves-newest-producer-wins
   (let* ((graph (make-graph))
           (older
