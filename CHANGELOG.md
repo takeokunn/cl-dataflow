@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - No changes yet.
 
+## [0.3.0] - 2026-07-24
+
+A structural and performance release. The public API is unchanged; the internals
+were reorganized for readability and the hot paths were optimized, with the
+suite grown to 510 tests and the 100% branch coverage gate held throughout.
+
+### Changed
+
+- Flattened the source layout: removed the `%load-fragment` macro and the six aggregator files (`core`, `core-models`, `core-models-accessors`, `core-runtime`, `graph-runtime`, `pipeline`, `state-machine`) that loaded their fragments a second time outside ASDF, listing every real source file directly in the system definition. This removes the double-load that previously confused the fasl cache.
+- Split the oversized `graph-paths` module into `graph-closure`, `graph-shortest-path`, `graph-flow`, and `graph-eulerian`, leaving `graph-paths` focused on path enumeration.
+- Consolidated the twelve single-source reactive operators into a `define-subject-operator` macro so each carries only its own transformation logic, routed the stream consumers through a shared `do-stream` macro, and drove the pipeline/state-machine DSL expanders and the graph eccentricity family from schema tables instead of hand-rolled duplicates.
+- Made structural deep-copy stack-safe with an explicit CPS trampoline, so copying a very long or deeply nested value runs in bounded control-stack depth, and skipped the memo table entirely for atomic values.
+- Added file-purpose header comments across the source modules, switched `%normalize-name` from `etypecase` to `typecase` to drop a phantom coverage branch, and removed a provably-unreachable guard in the Prolog adjacency builder.
+- Adopted the `nerima-lisp` org for the `cl-prolog`, `cl-weave`, and `paredit-cli` flake inputs, added `cl-process-kit` (replacing a hand-rolled fork/exec/kill timeout in the example test), and bounded the release CI job with a timeout.
+
+### Performance
+
+- Index state-machine transitions by from-state and event type (built once in `initialize-instance`, kept in lock-step with the transitions slot), replacing the linear per-step scan.
+- Cache a pipeline execution plan (stage signatures, incoming-edge index, and per-node input/output value-key plans) and reuse it while the topology is unchanged, dropping per-run graph analysis and per-stage continuations.
+- Append reactive subscribers through a tail pointer and emit against a snapshot, eliminating per-emission allocation; drop the redundant fourth copy of each transition record when recording history.
+- Give `stream-distinct` and `subject-distinct` a hash fast-path for standard test designators, falling back to `member` semantics for custom predicates and structural values.
+
 ## [0.2.0] - 2026-07-20
 
 ### Added
@@ -99,6 +121,7 @@ public package.
 - Fixed guarded state-machine transition selection: when several transitions share a `(state, event)` pair, a rejecting guard now falls through to the next candidate, and `guard-failed-error` is signalled only when every matching guard rejects. `state-machine-can-step-p` uses the same guard-aware selection.
 - Fixed `define-pipeline` and `define-workflow` to evaluate a `:metadata`/`:pipeline-metadata` form once instead of twice, and to gensym their internal `graph`, `edge`, and `machine` bindings so user handler/guard/action forms can no longer capture them.
 
-[Unreleased]: https://github.com/takeokunn/cl-dataflow/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/takeokunn/cl-dataflow/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/takeokunn/cl-dataflow/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/takeokunn/cl-dataflow/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/takeokunn/cl-dataflow/releases/tag/v0.1.0

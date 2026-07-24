@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/takeokunn/cl-dataflow/actions/workflows/ci.yml/badge.svg)](https://github.com/takeokunn/cl-dataflow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.0-brightgreen.svg)](CHANGELOG.md)
 [![SBCL](https://img.shields.io/badge/SBCL-supported-red.svg)](http://www.sbcl.org/)
 
 `cl-dataflow` is a small Common Lisp library for composable computation graphs, pipelines, event-driven workflows, state machines, and effect boundaries.
@@ -56,7 +56,7 @@
 ## Install
 
 Place this checkout and `cl-prolog` in locations ASDF can see, then load the
-system. The test system additionally requires `cl-weave`.
+system. The test system additionally requires `cl-weave` and `cl-process-kit`.
 
 ```lisp
 (asdf:load-system :cl-dataflow)
@@ -218,9 +218,9 @@ The library is organized around a small set of composable primitives:
 `cl-dataflow` keeps the implementation deliberately small:
 
 - `src/package.lisp` defines the public package and exported API surface.
-- `src/core.lisp` holds the shared graph, node, and context primitives.
+- The shared graph, node, and context primitives live in focused `src/core-*.lisp` files (normalization, structural copying, slot accessors, conditions, model classes/constructors, and the `cl-prolog`-backed graph runtime), each listed directly in the system definition.
 - `src/protocols.lisp` defines the shared introspection and printing protocols.
-- `src/pipeline.lisp`, `src/events.lisp`, `src/effects.lisp`, and `src/state-machine.lisp` split the runtime behavior into focused files.
+- Runtime behavior is split by concern into focused files: `src/pipeline-macros.lisp`/`src/pipeline-runtime.lisp`, `src/state-machine-macros.lisp`/`src/state-machine-runtime-*.lisp`, `src/events.lisp`, and `src/effects.lisp`. Each DSL keeps its expander next to a schema table, and each runtime keeps its execution logic beside it.
 - `src/testing.lisp` contains deterministic test helpers, including state-machine assertions.
 - The graph runtime models edges as a `cl-prolog` fact base. `topological-sort`
   and `graph-reachable-p` read the edge relation with a single bulk
