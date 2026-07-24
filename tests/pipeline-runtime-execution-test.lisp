@@ -240,3 +240,44 @@
             (cl-dataflow::%pipeline-execution-plan-output-key-plans
               (cl-dataflow::%pipeline-execution-plan pipeline)))
           "light")))))
+
+(deftest pipeline-fan-in-node-resolves-multiple-cached-input-bindings
+  ;; A node fed by two incoming edges resolves more than one binding, which is
+  ;; the cached execution plan's multi-binding path (%RESOLVE-INPUT-KEY-PLAN +
+  ;; the T branch of %RUN-NODE's input cond); single-source pipelines never
+  ;; reach it.
+  (let* ((graph (make-graph))
+         (source (make-node "source"
+                            :outputs '("left" "right")
+                            :handler (lambda (input context)
+                                       (declare (ignore context))
+                                       (list (cons "left" (1+ input))
+                                             (cons "right" (* input 2))))))
+         (join (make-node "join"
+                          :inputs '("a" "b")
+                          :outputs '("sum")
+                          :handler (lambda (input context)
+                                     (declare (ignore context))
+                                     (reduce #'+ input :key #'cdr)))))
+    (add-node graph source)
+    (add-node graph join)
+    (add-edge graph source join :from-port "left" :to-port "a")
+    (add-edge graph source join :from-port "right" :to-port "b")
+    (is (= (run-pipeline (make-pipeline :graph graph) :input 5) 16))))
+
+(deftest pipeline-empty-pipeline-run-yields-no-sink-result
+  ;; With no stages the plan has no sink-result plans, exercising the empty-sinks
+  ;; branch of the cached sink collector.
+  (is (null (run-pipeline (make-pipeline)))))
+
+(deftest pipeline-signature-currency-checks-detect-length-mismatch
+  ;; A plan's own stage and signature lists are always equal length in normal
+  ;; use, so the currency checks' unequal-length outcome (they return NIL) is
+  ;; reached here by calling them directly, matching the internal-test pattern.
+  (let ((graph (make-graph))
+        (node (make-node "n")))
+    (add-node graph node)
+    (is (cl-dataflow::%pipeline-stage-signatures-current-p graph '() '()))
+    (is (not (cl-dataflow::%pipeline-stage-signatures-current-p graph (list node) '())))
+    (is (cl-dataflow::%pipeline-edge-signatures-current-p '() '()))
+    (is (not (cl-dataflow::%pipeline-edge-signatures-current-p (list :edge) '())))))
