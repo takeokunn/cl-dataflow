@@ -205,3 +205,28 @@
                   (string-upcase (string symbol)))
                 symbols)
         #'string<))
+
+(defun collect-single-source-emissions (build inputs)
+  "Drive a single-source reactive operator and return what it emitted. BUILD is
+applied to a fresh source subject and must return the derived subject to observe;
+each of INPUTS is then emitted on the source in order. Returns the list of values
+the derived subject emitted, in emission order."
+  (let* ((source (make-subject))
+         (derived (funcall build source))
+         (collector (subject-collect derived)))
+    (dolist (value inputs) (subject-emit source value))
+    (funcall collector)))
+
+(defmacro define-single-source-subject-tests (&body specs)
+  "Define one DEFTEST per (NAME BUILDER INPUTS EXPECTED) spec, collapsing the
+build-source / derive / emit-inputs / assert-collected boilerplate every
+single-source subject operator test repeats. BUILDER is a function form mapping a
+fresh source subject to the derived subject under test; INPUTS are emitted in
+order; the collected emissions must EQUAL the literal EXPECTED list."
+  `(progn
+     ,@(mapcar (lambda (spec)
+                 (destructuring-bind (name builder inputs expected) spec
+                   `(deftest ,name
+                      (is (equal (collect-single-source-emissions ,builder ',inputs)
+                                 ',expected)))))
+               specs)))

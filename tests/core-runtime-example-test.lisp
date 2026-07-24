@@ -1,15 +1,15 @@
 (in-package #:cl-dataflow.test)
 
 (defun %repository-root ()
-  (merge-pathnames
-   #P"../"
-   (make-pathname :name nil
-                  :type nil
-                  :defaults (or *load-truename*
-                                *load-pathname*
-                                *default-pathname-defaults*))))
+  "The checkout root, resolved through ASDF's own system location rather than
+*LOAD-TRUENAME*/*LOAD-PATHNAME* -- those are only bound during a LOAD's dynamic
+extent, so a reflection-based lookup breaks once tests actually run instead of
+load. ASDF:SYSTEM-SOURCE-DIRECTORY returns the directory holding cl-dataflow.asd
+itself (the checkout root), since both systems are declared there."
+  (asdf:system-source-directory "cl-dataflow/test"))
 
 (defparameter *example-script-timeout-seconds* 30)
+(defparameter *program-probe-timeout-seconds* 10)
 
 (defun %example-smoke-tests-enabled-p ()
   "Return true when tests should spawn external SBCL example processes.
@@ -18,39 +18,6 @@ The verification script runs examples as a separate step. Keeping in-suite
 example process spawning opt-in avoids implementation-specific run-program
 deadlocks in the main test process."
   (string= (uiop:getenv "CL_DATAFLOW_RUN_EXAMPLE_SMOKE") "1"))
-
-(defun %command-with-timeout (seconds command)
-  (append (list "perl"
-                "-MPOSIX=:sys_wait_h"
-                "-e"
-                (concatenate 'string
-                             "my $seconds = shift @ARGV;"
-                             "my $pid = fork();"
-                             "die \"fork failed: $!\" unless defined $pid;"
-                             "if ($pid == 0) {"
-                             "  POSIX::setpgid(0, 0) or die \"setpgid failed: $!\";"
-                             "  exec @ARGV or die \"exec failed: $!\";"
-                             "}"
-                             "my $deadline = time + $seconds;"
-                             "while (1) {"
-                             "  my $done = waitpid($pid, WNOHANG);"
-                             "  if ($done == $pid) {"
-                             "    exit(($? >> 8) || (($? & 127) ? 128 + ($? & 127) : 0));"
-                             "  }"
-                             "  if (time >= $deadline) {"
-                             "    kill 'TERM', -$pid;"
-                             "    sleep 1;"
-                             "    $done = waitpid($pid, WNOHANG);"
-                             "    if ($done != $pid) {"
-                             "      kill 'KILL', -$pid;"
-                             "      waitpid($pid, 0);"
-                             "    }"
-                             "    exit 124;"
-                             "  }"
-                             "  select undef, undef, undef, 0.1;"
-                             "}"))
-          (list (write-to-string seconds))
-          command))
 
 (defun %program-available-p (program)
   "Return true when PROGRAM can be launched on this machine.
@@ -61,10 +28,9 @@ unavailable rather than a test failure, so the suite stays green on CI images
 that build under a non-SBCL implementation."
   (handler-case
       (progn
-        (uiop:run-program (list program "--version")
-                          :output nil
-                          :error-output nil
-                          :ignore-error-status t)
+        (run program (list "--version")
+             :timeout-seconds *program-probe-timeout-seconds*
+             :on-timeout :return)
         t)
     (error () nil)))
 
@@ -77,30 +43,23 @@ assertions. Prefers a system SBCL, then falls back to `nix run nixpkgs#sbcl`."
   (unless (%example-smoke-tests-enabled-p)
     (return-from %run-example-script (values nil nil)))
   (let ((script (namestring (merge-pathnames relative-path (%repository-root)))))
-    (labels ((run-with (command)
-               (uiop:run-program (%command-with-timeout
-                                  *example-script-timeout-seconds*
-                                  (append command (list script)))
-                                 :output :string
-                                 :error-output :string
-                                 :ignore-error-status t))
-             (check (stdout stderr exit-code)
-               (is (/= exit-code 124)
+    (labels ((run-with (program arguments)
+               (run program (append arguments (list script))
+                    :timeout-seconds *example-script-timeout-seconds*
+                    :on-timeout :return))
+             (check (result)
+               (is (not (process-result-timed-out-p result))
                    (format nil "Example script timed out after ~D seconds: ~A"
                            *example-script-timeout-seconds*
                            relative-path))
-               (is (= exit-code 0))
-               (is (stringp stderr))
-               (values stdout t)))
+               (is (eql (process-result-exit-code result) 0))
+               (is (stringp (process-result-stderr result)))
+               (values (process-result-stdout result) t)))
       (cond
         ((%program-available-p "sbcl")
-         (multiple-value-bind (stdout stderr exit-code)
-             (run-with '("sbcl" "--script"))
-           (check stdout stderr exit-code)))
+         (check (run-with "sbcl" '("--script"))))
         ((%program-available-p "nix")
-         (multiple-value-bind (stdout stderr exit-code)
-             (run-with '("nix" "run" "nixpkgs#sbcl" "--" "--script"))
-           (check stdout stderr exit-code)))
+         (check (run-with "nix" '("run" "nixpkgs#sbcl" "--" "--script"))))
         (t
          (values nil nil))))))
 

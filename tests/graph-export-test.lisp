@@ -13,6 +13,23 @@
       (is (< (search "\"a\" -> \"b\"" dot)
              (search "\"a\" -> \"c\"" dot))))))
 
+(deftest graph->dot-and-mermaid-match-recorded-snapshots
+  ;; Snapshot tests (cl-weave :to-match-snapshot) complement the fragment
+  ;; checks above: they catch any unintended change anywhere in the full
+  ;; rendered text, not just the substrings asserted elsewhere. Regenerate
+  ;; with CL_WEAVE_UPDATE_SNAPSHOTS=1 after an intentional rendering change.
+  ;; *SNAPSHOT-DIRECTORY* is bound to an absolute path explicitly: cl-weave
+  ;; resolves its default relative location against *DEFAULT-PATHNAME-DEFAULTS*,
+  ;; which some invocations of this suite (e.g. a saved executable image)
+  ;; leave unbound.
+  (let ((*snapshot-directory*
+          (merge-pathnames #P"__snapshots__/" (asdf:system-source-directory "cl-dataflow/test"))))
+    (with-graph-fixture (graph
+                         ((a "a") (b "b") (c "c"))
+                         :edges ((a b) (a c)))
+      (expect (graph->dot graph :name "flow") :to-match-snapshot "graph-export/dot-basic")
+      (expect (graph->mermaid graph :direction "LR") :to-match-snapshot "graph-export/mermaid-basic"))))
+
 (deftest graph->dot-escapes-quotes-in-names
   (with-graph-fixture (graph ((weird "a\"b")))
     (is (search "\"a\\\"b\"" (graph->dot graph)))))

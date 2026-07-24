@@ -104,6 +104,10 @@
                                      (make-transition "running" "tick" "idle")))))
     (signals invalid-input-error
       (make-state-machine :state "idle" :history-limit -1))
+    ;; A non-integer limit fails the INTEGERP half of the check rather than
+    ;; the MINUSP half -1 exercises above.
+    (signals invalid-input-error
+      (make-state-machine :state "idle" :history-limit "2"))
     (step-state-machine machine "tick")
     (step-state-machine machine "tick")
     (setf (state-machine-history-limit machine) 1)

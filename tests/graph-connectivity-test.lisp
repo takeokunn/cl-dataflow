@@ -118,6 +118,20 @@
     (is (equal (graph-betweenness-centrality graph)
                '(("a" . 0) ("b" . 0) ("c" . 0))))))
 
+(deftest graph-betweenness-centrality-runs-brandes-bfs-once-per-node
+  ;; A cl-weave spy verifies the INTERACTION shape of Brandes' algorithm (one
+  ;; BFS phase per node) rather than just its output, guarding the phase split
+  ;; into %BETWEENNESS-BFS/%BETWEENNESS-ACCUMULATE against an accidental
+  ;; double run or a skipped source.
+  (let ((spy (spy-on 'cl-dataflow::%betweenness-bfs)))
+    (unwind-protect
+        (with-graph-fixture (graph
+                             ((a "a") (b "b") (c "c") (d "d"))
+                             :edges ((a b) (a c) (b d) (c d)))
+          (graph-betweenness-centrality graph)
+          (expect spy :to-have-been-called-times 4))
+      (mock-restore spy))))
+
 (deftest graph-wiener-index-and-average-path-length
   ;; Path a -> b -> c: distances are a->b 1, a->c 2, b->c 1, summing to 4 over 3
   ;; reachable pairs, so the average path length is 4/3.

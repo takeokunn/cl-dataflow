@@ -1,11 +1,5 @@
 (in-package #:cl-dataflow.test)
 
-(eval-when (:load-toplevel :execute)
-  (dolist (test-file '("core-runtime-example-test.lisp"
-                        "core-runtime-protocol-test.lisp"
-                        "core-runtime-graph-test.lisp"))
-    (%load-fragment test-file)))
-
 (define-public-api-contract-test public-api-exports-match-documentation
   "CL-DATAFLOW"
   (:classes

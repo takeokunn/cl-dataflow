@@ -13,7 +13,9 @@
                       :handler (lambda (input context)
                                  (declare (ignore context))
                                  (1+ input)))
-                     (:edge "source" "sink" :metadata '((:edge-kind :flow)))))
+                     (:edge "source" "sink"
+                      :from-port "value"
+                      :metadata '((:edge-kind :flow)))))
          (graph (pipeline-graph pipeline))
          (edges (graph-edges graph)))
     (is (equal (mapcar #'node-name (pipeline-stages pipeline))
@@ -21,6 +23,49 @@
     (is (= (length edges) 1))
     (is (equal (edge-metadata (first edges))
                '((:edge-kind :flow))))))
+
+(deftest internal-parse-pipeline-edge-clause-passes-non-metadata-options-through
+  ;; Called directly (rather than through DEFINE-PIPELINE) so this runs at
+  ;; test-execution time and exercises both outcomes of the option-filtering
+  ;; UNLESS in the same pass: :METADATA is handled separately via
+  ;; SETF EDGE-METADATA, while every other key/value pair is threaded through
+  ;; to ADD-EDGE.
+  (let ((form (cl-dataflow::%parse-pipeline-edge-clause
+               '(:edge "a" "b" :from-port "x" :metadata (:k :v))
+               'graph-var)))
+    (is (search "FROM-PORT" (write-to-string form)))
+    (is (search "EDGE-METADATA" (write-to-string form)))))
+
+(deftest internal-workflow-clause-forms-partitions-by-kind
+  (multiple-value-bind (transitions nodes edges)
+      (cl-dataflow::%workflow-clause-forms
+       '((:transition t1) (:pipeline-node n1) (:pipeline-edge e1) (:pipeline-node n2)))
+    (is (equal transitions '(t1)))
+    (is (equal nodes '(n1 n2)))
+    (is (equal edges '(e1)))))
+
+(deftest define-pipeline-stages-accept-node-designators
+  ;; :STAGES may name stages by NODE object as well as by string, exercising
+  ;; the other branch of %RESOLVE-PIPELINE-STAGE-DESIGNATORS.
+  (let* ((source (make-node "source"
+                            :outputs '("value")
+                            :handler (lambda (input context)
+                                       (declare (ignore context))
+                                       input)))
+         (pipeline (define-pipeline (:stages (list source "sink"))
+                     (:node "source"
+                      :outputs '("value")
+                      :handler (lambda (input context)
+                                 (declare (ignore context))
+                                 input))
+                     (:node "sink"
+                      :inputs '("value")
+                      :handler (lambda (input context)
+                                 (declare (ignore context))
+                                 (1+ input)))
+                     (:edge "source" "sink"))))
+    (is (equal (mapcar #'node-name (pipeline-stages pipeline))
+               '("source" "sink")))))
 
 (define-invalid-dsl-test define-pipeline-rejects-unknown-clauses-at-macroexpand-time
   (define-pipeline ()

@@ -9,20 +9,17 @@
                 #:gen-state-machine
                 #:gen-tuple
                 #:it-property
-                #:signals)
+                #:mutation-summary
+                #:run-mutations
+                #:signals
+                #:*snapshot-directory*
+                #:mock-restore
+                #:spy-on)
+  (:import-from #:process-kit
+                #:run
+                #:process-result-exit-code
+                #:process-result-stdout
+                #:process-result-stderr
+                #:process-result-timed-out-p)
   (:export #:run-tests))
 
-(in-package #:cl-dataflow.test)
-
-(defmacro %load-fragment (pathname)
-  (let ((source-directory
-          (make-pathname :name nil
-                          :type nil
-                          :defaults (or *compile-file-pathname*
-                                        *load-truename*))))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-        (load (merge-pathnames ,pathname ,source-directory)))))
-
-(%load-fragment #P"test-support-assertions.lisp")
-(%load-fragment #P"test-support-fixtures.lisp")
-(%load-fragment #P"test-runner.lisp")

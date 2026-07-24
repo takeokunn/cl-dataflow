@@ -102,6 +102,26 @@
     (is (equal (mapcar #'node-name (pipeline-stages pipeline))
                '("stage-one" "stage-two")))))
 
+(deftest pipeline-sequential-graph-accepts-plist-stage-specs
+  ;; %BUILD-SEQUENTIAL-GRAPH normalizes each stage through
+  ;; %NORMALIZE-STAGE-SPEC, which accepts a NODE object as-is or builds one
+  ;; from a plist; mixing both in one :STAGES list exercises both branches.
+  (let* ((source (make-node "source"
+                            :outputs '("value")
+                            :handler (lambda (input context)
+                                       (declare (ignore context))
+                                       input)))
+         (pipeline (make-pipeline
+                    :stages (list source
+                                  (list :name "sink"
+                                        :inputs '("value")
+                                        :handler (lambda (input context)
+                                                   (declare (ignore context))
+                                                   (1+ input)))))))
+    (is (equal (mapcar #'node-name (pipeline-stages pipeline))
+               '("source" "sink")))
+    (is (= (length (graph-edges (pipeline-graph pipeline))) 1))))
+
 (deftest copy-pipeline-produces-independent-pipeline
   (with-linear-test-pipeline (graph pipeline source sink
                                     :source-metadata '((:kind :source))

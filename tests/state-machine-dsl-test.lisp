@@ -27,6 +27,12 @@
   '(:initial-state "idle" :metadata)
   "DEFINE-STATE-MACHINE options must be a property list")
 
+(define-invalid-dsl-test define-state-machine-rejects-non-list-clauses-at-macroexpand-time
+  (define-state-machine (:initial-state "idle")
+    :transition)
+  :transition
+  "DEFINE-STATE-MACHINE clauses require FROM EVENT TO")
+
 (define-invalid-dsl-test define-state-machine-rejects-short-clauses-at-macroexpand-time
   (define-state-machine (:initial-state "idle")
     ("idle" "start"))

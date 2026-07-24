@@ -1,18 +1,28 @@
 (in-package #:cl-dataflow.test)
 
-(deftest subject-scan-emits-running-accumulations
-  (let* ((source (make-subject))
-         (running (subject-scan source #'+ 0))
-         (collector (subject-collect running)))
-    (dolist (value '(1 2 3)) (subject-emit source value))
-    (is (equal (funcall collector) '(1 3 6)))))
+;;; Single-source operators whose whole contract is "given these inputs, emit
+;;; these outputs" are specified declaratively: each line is
+;;; (NAME BUILDER INPUTS EXPECTED). Operators needing side-effect checks,
+;;; multiple sources, multiple outputs, or extra assertions keep their own
+;;; DEFTEST below.
 
-(deftest subject-distinct-suppresses-repeats
-  (let* ((source (make-subject))
-         (unique (subject-distinct source))
-         (collector (subject-collect unique)))
-    (dolist (value '(1 2 1 3 2 4)) (subject-emit source value))
-    (is (equal (funcall collector) '(1 2 3 4)))))
+(define-single-source-subject-tests
+  (subject-scan-emits-running-accumulations
+   (lambda (s) (subject-scan s #'+ 0)) (1 2 3) (1 3 6))
+  (subject-distinct-suppresses-repeats
+   (lambda (s) (subject-distinct s)) (1 2 1 3 2 4) (1 2 3 4))
+  (subject-take-limits-emissions
+   (lambda (s) (subject-take s 2)) (10 20 30 40) (10 20))
+  (subject-drop-skips-the-first-n
+   (lambda (s) (subject-drop s 2)) (10 20 30 40) (30 40))
+  ;; 1,2 pass; 3 fails and stops forever, so the later 1 is not re-emitted.
+  (subject-take-while-stops-at-first-failure
+   (lambda (s) (subject-take-while s (lambda (x) (< x 3)))) (1 2 3 1) (1 2))
+  ;; 1,2 dropped; from 3 on everything is forwarded, including the later 1.
+  (subject-drop-while-forwards-after-first-failure
+   (lambda (s) (subject-drop-while s (lambda (x) (< x 3)))) (1 2 3 1) (3 1))
+  (subject-count-emits-running-total
+   (lambda (s) (subject-count s)) (:a :b :c) (1 2 3)))
 
 (deftest subject-tap-observes-without-changing
   (let* ((source (make-subject))
@@ -22,13 +32,6 @@
     (dolist (value '(1 2 3)) (subject-emit source value))
     (is (equal (funcall collector) '(1 2 3)))
     (is (equal (nreverse seen) '(1 2 3)))))
-
-(deftest subject-take-limits-emissions
-  (let* ((source (make-subject))
-         (first-two (subject-take source 2))
-         (collector (subject-collect first-two)))
-    (dolist (value '(10 20 30 40)) (subject-emit source value))
-    (is (equal (funcall collector) '(10 20)))))
 
 (deftest subject-zip-pairs-in-lockstep
   (let* ((a (make-subject))
@@ -65,36 +68,6 @@
     (is (equal (funcall collector) '((1 2) (3 4))))
     (signals invalid-input-error (subject-buffer source 0))))
 
-(deftest subject-drop-skips-the-first-n
-  (let* ((source (make-subject))
-         (dropped (subject-drop source 2))
-         (collector (subject-collect dropped)))
-    (dolist (value '(10 20 30 40)) (subject-emit source value))
-    (is (equal (funcall collector) '(30 40)))))
-
-(deftest subject-take-while-stops-at-first-failure
-  (let* ((source (make-subject))
-         (taken (subject-take-while source (lambda (x) (< x 3))))
-         (collector (subject-collect taken)))
-    ;; 1,2 pass; 3 fails and stops forever, so the later 1 is not re-emitted.
-    (dolist (value '(1 2 3 1)) (subject-emit source value))
-    (is (equal (funcall collector) '(1 2)))))
-
-(deftest subject-drop-while-forwards-after-first-failure
-  (let* ((source (make-subject))
-         (kept (subject-drop-while source (lambda (x) (< x 3))))
-         (collector (subject-collect kept)))
-    ;; 1,2 dropped; from 3 on everything is forwarded, including the later 1.
-    (dolist (value '(1 2 3 1)) (subject-emit source value))
-    (is (equal (funcall collector) '(3 1)))))
-
-(deftest subject-count-emits-running-total
-  (let* ((source (make-subject))
-         (counted (subject-count source))
-         (collector (subject-collect counted)))
-    (dolist (value '(:a :b :c)) (subject-emit source value))
-    (is (equal (funcall collector) '(1 2 3)))))
-
 (deftest subject-flat-map-forwards-inner-emissions
   (let* ((source (make-subject))
          (inner-a (make-subject))
@@ -116,3 +89,34 @@
         (dolist (value '(1 2 3 4 5 6)) (subject-emit source value))
         (is (equal (funcall even-log) '(2 4 6)))
         (is (equal (funcall odd-log) '(1 3 5)))))))
+
+;;; --- DEFINE-SUBJECT-OPERATOR machinery -----------------------------------
+;;; These test the DSL that generates the operators above directly, at test
+;;; time, so every clause-parsing branch is exercised and observed (the real
+;;; operator definitions expand at file-compile time, before coverage starts).
+
+(deftest define-subject-operator-body-parser-splits-clauses
+  (flet ((parse (body)
+           (multiple-value-list (cl-dataflow::%parse-subject-operator-body body))))
+    ;; docstring + :before + :state, in that order
+    (is (equal (parse '("doc" (:before (guard n)) (:state (acc 0) (seen nil))
+                        (emit value)))
+               '(("doc") ((guard n)) ((acc 0) (seen nil)) ((emit value)))))
+    ;; no docstring and no clauses: the whole body is the subscriber
+    (is (equal (parse '((emit value)))
+               '(() () () ((emit value)))))
+    ;; :state only, no docstring
+    (is (equal (parse '((:state (remaining n)) (emit value)))
+               '(() () ((remaining n)) ((emit value)))))
+    ;; empty body: nothing to split (guards the atom/exhausted-body branch)
+    (is (equal (parse '())
+               '(() () () ())))))
+
+(deftest define-subject-operator-expands-to-a-defun
+  (let ((expansion (macroexpand-1
+                    '(cl-dataflow::define-subject-operator demo (source factor)
+                      "Scale each value." (:state (total 0)) (emit (* value factor))))))
+    (is (eq (first expansion) 'defun))
+    (is (eq (second expansion) 'demo))
+    (is (equal (third expansion) '(source factor)))
+    (is (equal (fourth expansion) "Scale each value."))))

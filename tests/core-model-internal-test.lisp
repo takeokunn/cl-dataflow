@@ -137,7 +137,12 @@
     (is (equal (cl-dataflow::%normalize-output-structure 7 '("value"))
                '(("value" . 7))))
     (is (equal (cl-dataflow::%hash-table-keys table)
-               '("value" "other")))))
+               '("value" "other")))
+    ;; An odd-length, non-alist list is neither a plist nor an alist, so
+    ;; %CLASSIFY-STRUCTURED-VALUE falls through to :SCALAR -- exercising
+    ;; EVENP's false outcome, which every other structured-value fixture here
+    ;; is even-length and so never reaches.
+    (is (not (cl-dataflow::%structured-value-p '(:odd-length))))))
 
 (deftest internal-copy-structured-value-preserves-circular-structures
   (let ((value (list "loop")))
@@ -157,6 +162,18 @@
     (let ((copy (cl-dataflow::%copy-structured-value table)))
       (is (not (eq copy table)))
       (is (eq (gethash "self" copy) copy)))))
+
+(deftest internal-copy-structured-value-trampolines-a-long-cons-chain
+  ;; %COPY-STRUCTURED-VALUE/CPS bounces its cons-chain traversal through
+  ;; %RUN-COPY-TRAMPOLINE instead of recursing, so a list far longer than
+  ;; SBCL's default control-stack depth still copies without a stack
+  ;; exhaustion error.
+  (let* ((length 500000)
+         (value (loop for i below length collect i))
+         (copy (cl-dataflow::%copy-structured-value value)))
+    (is (equal copy value))
+    (is (not (eq copy value)))
+    (is (= (length copy) length))))
 
 (deftest internal-error-copy-helpers-copy-nested-model-structures
   (let* ((node (make-node "source"
@@ -182,4 +199,25 @@
       (is (equal (node-inputs node) '("in")))
       (is (equal (node-metadata node) '((:kind :stage))))
       (is (equal (edge-metadata edge) '((:kind :edge))))
-      (is (equal (graph-metadata graph) '((:kind :graph)))))))
+      (is (equal (graph-metadata graph) '((:kind :graph)))))
+    (let* ((event (make-event "started" :payload '(:n 1)))
+           (event-copy (cl-dataflow::%copy-error-value event)))
+      (is (not (eq event-copy event)))
+      (is (equal (event-payload event-copy) (event-payload event))))
+    (let* ((effect (make-effect "log" :payload '(:msg "hi")))
+           (effect-copy (cl-dataflow::%copy-error-value effect)))
+      (is (not (eq effect-copy effect)))
+      (is (equal (effect-payload effect-copy) (effect-payload effect))))))
+
+(deftest internal-node-error-snapshot-defaults-unbound-slots
+  ;; %COPY-NODE-ERROR-SNAPSHOT exists to snapshot a node for error reporting
+  ;; even when construction left a slot unbound; %SLOT-VALUE-OR must fall back
+  ;; to its default rather than signalling UNBOUND-SLOT in that case.
+  (let ((node (make-node "partial" :inputs '("in"))))
+    (slot-makunbound node 'cl-dataflow::outputs)
+    (let ((snapshot (cl-dataflow::%copy-node-error-snapshot node)))
+      (is (equal (node-name snapshot) "partial"))
+      (is (equal (node-inputs snapshot) '("in")))
+      ;; NODE-OUTPUTS normalizes NIL back to the default ("value") port on
+      ;; read, so check the raw slot to confirm %SLOT-VALUE-OR's fallback.
+      (is (null (slot-value snapshot 'cl-dataflow::outputs))))))

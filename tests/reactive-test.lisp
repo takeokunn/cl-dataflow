@@ -54,20 +54,18 @@
         (is (equal (reverse seen) '((:second . :value) (:third . :value))))
         (is (= (subject-subscriber-count subject) 2))))))
 
-(deftest subject-map-transforms-emissions
-  (let* ((source (make-subject))
-         (doubled (subject-map source (lambda (x) (* x 2))))
-         (collector (subject-collect doubled)))
-    (subject-emit source 1)
-    (subject-emit source 5)
-    (is (equal (funcall collector) '(2 10)))))
-
-(deftest subject-filter-drops-non-matching
-  (let* ((source (make-subject))
-         (evens (subject-filter source #'evenp))
-         (collector (subject-collect evens)))
-    (dolist (value '(1 2 3 4 5 6)) (subject-emit source value))
-    (is (equal (funcall collector) '(2 4 6)))))
+;; Single-source operators (and their compositions) as declarative specs; see
+;; DEFINE-SINGLE-SOURCE-SUBJECT-TESTS. SUBJECT-MERGE below has two sources and
+;; stays a hand-written DEFTEST.
+(define-single-source-subject-tests
+  (subject-map-transforms-emissions
+   (lambda (s) (subject-map s (lambda (x) (* x 2)))) (1 5) (2 10))
+  (subject-filter-drops-non-matching
+   (lambda (s) (subject-filter s #'evenp)) (1 2 3 4 5 6) (2 4 6))
+  ;; A small reactive pipeline: source -> filter evens -> map (*10).
+  (reactive-graph-chains-operators
+   (lambda (s) (subject-map (subject-filter s #'evenp) (lambda (x) (* x 10))))
+   (1 2 3 4) (20 40)))
 
 (deftest subject-merge-combines-sources
   (let* ((a (make-subject))
@@ -78,11 +76,3 @@
     (subject-emit b 2)
     (subject-emit a 3)
     (is (equal (funcall collector) '(1 2 3)))))
-
-(deftest reactive-graph-chains-operators
-  ;; A small reactive pipeline: source -> filter evens -> map (*10).
-  (let* ((source (make-subject))
-         (result (subject-map (subject-filter source #'evenp) (lambda (x) (* x 10))))
-         (collector (subject-collect result)))
-    (dolist (value '(1 2 3 4)) (subject-emit source value))
-    (is (equal (funcall collector) '(20 40)))))

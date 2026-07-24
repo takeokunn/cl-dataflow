@@ -251,6 +251,18 @@
       (is (equal (edge-from (node-not-found-designator captured)) "source"))
       (is (equal (edge-to (node-not-found-designator captured)) "missing")))))
 
+(deftest node-not-found-exposes-designator-when-edge-from-node-is-missing
+  ;; The companion to the -TO case above: %GRAPH-RULEBASE validates both the
+  ;; FROM and TO node of every edge, and the two checks are independent.
+  (with-graph-fixture (graph ((sink "sink")))
+    (setf (graph-edges graph)
+          (list (make-instance 'edge
+                                :from "missing"
+                                :from-port "value"
+                                :to "sink"
+                                :to-port "value")))
+    (signals node-not-found-error (topological-sort graph))))
+
 (deftest graph-errors-inherit-from-cl-dataflow-error
   (with-graph-fixture (graph ((source "source" :outputs '("left"))
                               (sink "sink" :inputs '("right"))))
