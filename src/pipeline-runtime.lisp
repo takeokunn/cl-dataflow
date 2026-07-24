@@ -1,63 +1,144 @@
 (in-package #:cl-dataflow)
 
-(defun %build-pipeline-graph (graph stages)
-  (cond
-    (graph
-     (let ((copied-graph (copy-graph graph)))
-       (values copied-graph
-               (%remap-pipeline-stages copied-graph
-                                       (or stages (topological-sort graph))))))
-    (stages
-     (%build-sequential-graph stages))
-    (t
-     (values (make-graph) '()))))
+(progn
+  (defun %build-pipeline-graph (graph stages)
+    (cond
+      (graph
+        (let ((copied-graph (copy-graph graph)))
+          (values
+            copied-graph
+            (%remap-pipeline-stages copied-graph (or stages (topological-sort graph))))))
+      (stages (%build-sequential-graph stages))
+      (t (values (make-graph) '()))))
+  (defun %make-pipeline-edge-signature (edge)
+    (make-instance
+      'pipeline-edge-signature
+      :edge
+      edge
+      :from
+      (%copy-structured-value (edge-from edge))
+      :from-port
+      (%copy-structured-value (edge-from-port edge))
+      :to
+      (%copy-structured-value (edge-to edge))
+      :to-port
+      (%copy-structured-value (edge-to-port edge))))
+  (defun %make-pipeline-execution-plan (graph stages)
+    (make-instance
+      'pipeline-execution-plan
+      :graph
+      graph
+      :stages
+      stages
+      :incoming-index
+      (%incoming-edges-index graph)
+      :edge-signatures
+      (loop for edge in (%graph-edges-list graph)
+            collect (%make-pipeline-edge-signature edge))))
+  (defun %pipeline-edge-signature-current-p (edge signature)
+    (and
+      (eq edge (%pipeline-edge-signature-edge signature))
+      (equal (edge-from edge) (%pipeline-edge-signature-from signature))
+      (equal (edge-from-port edge) (%pipeline-edge-signature-from-port signature))
+      (equal (edge-to edge) (%pipeline-edge-signature-to signature))
+      (equal (edge-to-port edge) (%pipeline-edge-signature-to-port signature))))
+  (defun %pipeline-stage-list-current-p (graph stages)
+    (loop for stage in stages
+          always (eq stage (find-node graph (node-name stage)))))
+  (defun %pipeline-edge-signatures-current-p (edges signatures)
+    (do ((remaining-edges edges (cdr remaining-edges))
+          (remaining-signatures signatures (cdr remaining-signatures)))
+      ((or (endp remaining-edges) (endp remaining-signatures))
+        (and (endp remaining-edges) (endp remaining-signatures)))
+      (unless (%pipeline-edge-signature-current-p
+          (car remaining-edges)
+          (car remaining-signatures))
+        (return nil))))
+  (defun %pipeline-execution-plan-current-p (pipeline plan)
+    (and
+      plan
+      (let ((graph (pipeline-graph pipeline)))
+        (and
+          (eq graph (%pipeline-execution-plan-graph plan))
+          (%pipeline-stage-list-current-p graph (%pipeline-execution-plan-stages plan))
+          (%pipeline-edge-signatures-current-p
+            (%graph-edges-list graph)
+            (%pipeline-execution-plan-edge-signatures plan))))))
+  (defun %rebuild-pipeline-execution-plan (pipeline)
+    (let* ((graph (pipeline-graph pipeline))
+            (stages (%remap-pipeline-stages graph (%pipeline-stages-list pipeline)))
+            (plan (%make-pipeline-execution-plan graph stages)))
+      (setf (slot-value pipeline 'stages) stages
+            (%pipeline-execution-plan pipeline) plan)
+      plan))
+  (defun %ensure-pipeline-execution-plan (pipeline)
+    (let ((plan (%pipeline-execution-plan pipeline)))
+      (if (%pipeline-execution-plan-current-p pipeline plan) plan
+        (%rebuild-pipeline-execution-plan pipeline)))))
 
 (defun make-pipeline (&key graph stages metadata)
-  (multiple-value-bind (resolved-graph resolved-stages)
-      (%build-pipeline-graph graph stages)
+  (multiple-value-bind (resolved-graph resolved-stages) (%build-pipeline-graph graph stages)
     (validate-graph resolved-graph)
-    (make-instance 'pipeline
-                   :graph resolved-graph
-                   :stages (copy-list resolved-stages)
-                   :metadata (%normalize-metadata metadata))))
+    (let ((internal-stages (copy-list resolved-stages)))
+      (make-instance
+        'pipeline
+        :graph
+        resolved-graph
+        :stages
+        internal-stages
+        :execution-plan
+        (%make-pipeline-execution-plan resolved-graph internal-stages)
+        :metadata
+        (%normalize-metadata metadata)))))
 
 (defun copy-pipeline (pipeline)
-  (make-pipeline :graph (pipeline-graph pipeline)
-                 :stages (pipeline-stages pipeline)
-                 :metadata (pipeline-metadata pipeline)))
+  (make-pipeline
+    :graph
+    (pipeline-graph pipeline)
+    :stages
+    (pipeline-stages pipeline)
+    :metadata
+    (pipeline-metadata pipeline)))
 
 (defmethod (setf pipeline-stages) (stages (pipeline pipeline))
   (let ((graph (pipeline-graph pipeline)))
     (validate-graph graph)
-    (setf (slot-value pipeline 'stages)
-          (if stages
-              (%remap-pipeline-stages graph stages)
-              '()))))
+    (let ((remapped-stages
+          (if stages (%remap-pipeline-stages graph stages)
+            '())))
+      (setf (slot-value pipeline 'stages) remapped-stages
+            (%pipeline-execution-plan pipeline) nil)
+      remapped-stages)))
 
 (defmethod pipeline-stages ((pipeline pipeline))
   (copy-list (%pipeline-stages-list pipeline)))
 
 (defun %copy-node-output-bindings (bindings)
-  (mapcar (lambda (binding)
-            (cons (car binding)
-                  (%copy-structured-value (cdr binding))))
-          bindings))
+  (mapcar
+    (lambda (binding)
+      (cons (car binding) (%copy-structured-value (cdr binding))))
+    bindings))
 
 (defun %make-node-trace-record (node node-input bindings)
-  (list :node (node-name node)
-        :input node-input
-        :output (%copy-node-output-bindings bindings)))
+  (list
+    :node
+    (node-name node)
+    :input
+    node-input
+    :output
+    (%copy-node-output-bindings bindings)))
 
 (defun %record-node-run (context node node-input bindings)
   (dolist (binding bindings)
     (%store-value context (node-name node) (car binding) (cdr binding)))
-  (push (%make-node-trace-record node node-input bindings)
-        (%context-trace-list context)))
+  (push
+    (%make-node-trace-record node node-input bindings)
+    (%context-trace-list context)))
 
 (defun %run-node/cps (context graph node input incoming-index continuation)
   (let* ((node-input (%collect-node-inputs context graph node input incoming-index))
-         (output (funcall (node-handler node) node-input context))
-         (bindings (%node-output-bindings node output)))
+          (output (funcall (node-handler node) node-input context))
+          (bindings (%node-output-bindings node output)))
     (%record-node-run context node node-input bindings)
     (funcall continuation output)))
 
@@ -68,32 +149,35 @@
 (defun %ensure-pipeline-context (context)
   (or context (make-context)))
 
-(defun %run-pipeline-stages/cps (context graph order input continuation)
-  ;; The incoming-edge index is built once per pipeline run (O(E)) instead of
-  ;; once per node (O(V*E) total for a run through V stages).
-  (let ((incoming-index (%incoming-edges-index graph)))
-    (labels ((advance-stages (remaining)
-               (if (endp remaining)
-                   (funcall continuation (%finalize-pipeline-run graph context order))
-                   (%run-node/cps context
-                                  graph
-                                  (first remaining)
-                                  input
-                                  incoming-index
-                                  (lambda (output)
-                                    (declare (ignore output))
-                                    (advance-stages (rest remaining)))))))
-      (advance-stages order))))
+(defun %run-pipeline-stages/cps (context graph order input incoming-index continuation)
+  (labels ((advance-stages (remaining)
+              (if (endp remaining) (funcall continuation (%finalize-pipeline-run graph context order))
+          (%run-node/cps
+            context
+            graph
+            (first remaining)
+            input
+            incoming-index
+            (lambda (output)
+              (declare (ignore output))
+              (advance-stages (rest remaining)))))))
+    (advance-stages order)))
 
 (defun run-pipeline (pipeline &key input context)
-  (let* ((graph (pipeline-graph pipeline))
-         (ctx (%ensure-pipeline-context context))
-         (order (%remap-pipeline-stages graph (pipeline-stages pipeline))))
-    (%run-pipeline-stages/cps ctx graph order input
-                              (lambda (result)
-                                result))))
+  (let* ((plan (%ensure-pipeline-execution-plan pipeline))
+          (graph (%pipeline-execution-plan-graph plan))
+          (ctx (%ensure-pipeline-context context))
+          (order (%pipeline-execution-plan-stages plan))
+          (incoming-index (%pipeline-execution-plan-incoming-index plan)))
+    (%run-pipeline-stages/cps
+      ctx
+      graph
+      order
+      input
+      incoming-index
+      (lambda (result)
+        result))))
 
 (defun run-pipeline-with-context (pipeline &key input context)
   (let ((ctx (%ensure-pipeline-context context)))
-    (values (run-pipeline pipeline :input input :context ctx)
-            ctx)))
+    (values (run-pipeline pipeline :input input :context ctx) ctx)))
