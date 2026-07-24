@@ -39,9 +39,11 @@
   (defun %pipeline-value-key (name port)
     (list name port))
   (defun %pipeline-output-key-plan (signature)
-    (loop with name = (%pipeline-stage-signature-name signature)
-          for port in (%pipeline-stage-signature-outputs signature)
-          collect (cons port (%pipeline-value-key name port))))
+    (let ((outputs (%pipeline-stage-signature-outputs signature))
+          (name (%pipeline-stage-signature-name signature)))
+      (cons outputs
+            (loop for port in outputs
+                  collect (cons port (%pipeline-value-key name port))))))
   (defun %pipeline-input-key-plan (binding-plan target-signature edge-signatures)
     (cons
       (car binding-plan)
@@ -67,7 +69,8 @@
     (loop for signature in stage-signatures
           for output-key-plan in output-key-plans
           when (eq sink (%pipeline-stage-signature-node signature))
-            return (cons (%pipeline-stage-signature-name signature) output-key-plan)))
+            return (cons (%pipeline-stage-signature-name signature)
+                          (cdr output-key-plan))))
   (defun %make-pipeline-execution-plan (graph stages)
     (let* ((incoming-index (%incoming-edges-index graph))
             (stage-signatures
@@ -230,7 +233,7 @@
     context
     (%make-node-trace-record node node-input bindings)))
 
-(defun %run-node (context node input input-key-plan output-key-plan)
+(defun %run-node (context node input input-key-plan output-names output-key-plan)
   (let* ((has-incoming-p (car input-key-plan))
           (bindings (cdr input-key-plan))
           (node-input
@@ -242,7 +245,7 @@
           (t (%collapse-single-binding-list (%resolve-input-key-plan context bindings)))))
           (output (funcall (node-handler node) node-input context))
           (output-bindings
-        (%node-output-bindings node output (mapcar (function car) output-key-plan))))
+        (%node-output-bindings node output output-names)))
     (%record-node-run context node node-input output-bindings output-key-plan)
     output))
 
@@ -254,7 +257,9 @@
   (loop for node in order
         for input-key-plan in input-key-plans
         for output-key-plan in output-key-plans
-        do (%run-node context node input input-key-plan output-key-plan))
+        do (%run-node context node input input-key-plan
+                      (car output-key-plan)
+                      (cdr output-key-plan)))
   (%finalize-pipeline-run context sink-result-plans))
 
 (progn

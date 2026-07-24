@@ -160,3 +160,40 @@
     (is (equal (nreverse seen) (quote (:first :failing))))
     (is (eq (context-result context) :not-finalized))
     (is (= (length (context-trace-in-order context)) 1))))
+
+(deftest
+  pipeline-output-name-plan-is-owned-and-invalidated-by-node-output-mutations
+  (let* ((stage
+        (make-node
+          "source"
+          :outputs
+          (list "left")
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            7)))
+          (pipeline (make-pipeline :stages (list stage)))
+          (live-node (find-node (pipeline-graph pipeline) "source"))
+          (setter-port (copy-seq "right"))
+          (original-plan (cl-dataflow::%pipeline-execution-plan pipeline)))
+    (setf (node-outputs live-node) (list setter-port))
+    (is (= (run-pipeline pipeline) 7))
+    (let* ((setter-plan (cl-dataflow::%pipeline-execution-plan pipeline))
+            (planned-name
+          (caaar (cl-dataflow::%pipeline-execution-plan-output-key-plans setter-plan)))
+            (live-name (first (cl-dataflow::%node-outputs-list live-node))))
+      (is (not (eq original-plan setter-plan)))
+      (is (string= planned-name "right"))
+      (is (not (eq planned-name live-name)))
+      (setf (char live-name 0) #\l)
+      (is (string= planned-name "right"))
+      (is (= (run-pipeline pipeline) 7))
+      (is
+        (not
+          (eq setter-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
+      (is
+        (string=
+          (caaar
+            (cl-dataflow::%pipeline-execution-plan-output-key-plans
+              (cl-dataflow::%pipeline-execution-plan pipeline)))
+          "light")))))
