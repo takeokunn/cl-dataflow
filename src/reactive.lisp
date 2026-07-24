@@ -62,23 +62,61 @@ pass."
   (dolist (subscriber (copy-list (subject-subscribers subject)) subject)
     (funcall subscriber value)))
 
-(defun subject-map (subject function)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun %parse-subject-operator-body (body)
+    "Split a DEFINE-SUBJECT-OPERATOR body into
+(VALUES DOCSTRING-FORMS BEFORE-FORMS STATE-BINDINGS SUBSCRIBER-FORMS): an optional
+leading docstring (as a splice-ready list, empty when absent), the :BEFORE forms,
+the :STATE bindings, and the remaining subscriber forms. Called at macro-expansion
+time, so it is wrapped in EVAL-WHEN to be available when the macro expands its uses
+in this same file."
+    (let ((docstring-forms '())
+          (before '())
+          (state '()))
+      (when (stringp (first body))
+        (setf docstring-forms (list (pop body))))
+      (loop for clause = (first body)
+            while (and (consp clause) (member (first clause) '(:before :state)))
+            do (if (eq (first clause) :before)
+                   (setf before (rest clause))
+                   (setf state (rest clause)))
+               (pop body))
+      (values docstring-forms before state body))))
+
+(defmacro define-subject-operator (name lambda-list &body body)
+  "Define NAME as a single-source derived-subject operator over the source subject
+named by the first parameter of LAMBDA-LIST. This captures the scaffold every such
+operator shares -- make a fresh subject, subscribe to the source, re-emit, return
+the subject -- so each definition carries only its own transformation logic.
+
+Optional leading clauses in BODY, in order: a docstring; then any mix of
+  (:before FORM*)  -- forms evaluated once at call time (e.g. argument validation);
+  (:state BINDING*) -- extra LET bindings holding per-operator closure state.
+The remaining BODY is the subscriber. It runs once per value the source emits with
+VALUE bound to that value, and the local macro EMIT pushes a value to the derived
+subject. NAME returns the derived subject."
+  (multiple-value-bind (docstring-forms before state subscriber)
+      (%parse-subject-operator-body body)
+    (let ((result (gensym "RESULT"))
+          (source (first lambda-list)))
+      `(defun ,name ,lambda-list
+         ,@docstring-forms
+         ,@before
+         (let ((,result (make-subject)) ,@state)
+           (macrolet ((emit (form) (list 'subject-emit ',result form)))
+             (subject-subscribe ,source (lambda (value) ,@subscriber)))
+           ,result)))))
+
+(define-subject-operator subject-map (subject function)
   "Return a derived subject that emits (FUNCALL FUNCTION VALUE) whenever SUBJECT
 emits VALUE."
-  (let ((result (make-subject)))
-    (subject-subscribe subject
-                       (lambda (value) (subject-emit result (funcall function value))))
-    result))
+  (emit (funcall function value)))
 
-(defun subject-filter (subject predicate)
+(define-subject-operator subject-filter (subject predicate)
   "Return a derived subject that re-emits only the values of SUBJECT for which
 PREDICATE is true."
-  (let ((result (make-subject)))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (when (funcall predicate value)
-                           (subject-emit result value))))
-    result))
+  (when (funcall predicate value)
+    (emit value)))
 
 (defun subject-merge (&rest subjects)
   "Return a derived subject that emits whenever any of SUBJECTS emits."

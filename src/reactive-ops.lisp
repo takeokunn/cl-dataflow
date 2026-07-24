@@ -6,50 +6,34 @@
 ;;;; per-operator state lives in the closure. Everything is synchronous, so an
 ;;;; emission propagates through the whole derived graph before EMIT returns.
 
-(defun subject-scan (subject function seed)
+(define-subject-operator subject-scan (subject function seed)
   "Return a derived subject that emits a running accumulation: starting from SEED,
 each source value V produces and emits (FUNCALL FUNCTION ACCUMULATOR V)."
-  (let ((result (make-subject))
-        (accumulator seed))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (setf accumulator (funcall function accumulator value))
-                         (subject-emit result accumulator)))
-    result))
+  (:state (accumulator seed))
+  (setf accumulator (funcall function accumulator value))
+  (emit accumulator))
 
-(defun subject-distinct (subject &key (test 'equal))
+(define-subject-operator subject-distinct (subject &key (test 'equal))
   "Return a derived subject that re-emits only values not previously emitted (under
 TEST). Runs in O(n) membership per emission."
-  (let ((result (make-subject))
-        (seen '()))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (unless (member value seen :test test)
-                           (push value seen)
-                           (subject-emit result value))))
-    result))
+  (:state (seen '()))
+  (unless (member value seen :test test)
+    (push value seen)
+    (emit value)))
 
-(defun subject-tap (subject function)
+(define-subject-operator subject-tap (subject function)
   "Return a derived subject that calls FUNCTION on each source value for its side
 effect, then re-emits the value unchanged."
-  (let ((result (make-subject)))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (funcall function value)
-                         (subject-emit result value)))
-    result))
+  (funcall function value)
+  (emit value))
 
-(defun subject-take (subject n)
+(define-subject-operator subject-take (subject n)
   "Return a derived subject that re-emits only the first N values of SUBJECT and
 ignores the rest."
-  (let ((result (make-subject))
-        (remaining n))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (when (plusp remaining)
-                           (decf remaining)
-                           (subject-emit result value))))
-    result))
+  (:state (remaining n))
+  (when (plusp remaining)
+    (decf remaining)
+    (emit value)))
 
 (defun subject-zip (subject-a subject-b)
   "Return a derived subject that pairs values of SUBJECT-A and SUBJECT-B in
@@ -110,71 +94,49 @@ emits, once both have emitted at least once."
                          (lambda (value) (setf latest-b value has-b t) (emit-combined))))
     result))
 
-(defun subject-buffer (subject n)
+(define-subject-operator subject-buffer (subject n)
   "Return a derived subject that collects every N source values into a list and
 emits that list. A trailing partial buffer is not emitted. N must be positive."
-  (%positive-size n "SUBJECT-BUFFER")
-  (let ((result (make-subject))
-        (buffer '())
-        (count 0))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (push value buffer)
-                         (incf count)
-                         (when (= count n)
-                           (subject-emit result (reverse buffer))
-                           (setf buffer '() count 0))))
-    result))
+  (:before (%positive-size n "SUBJECT-BUFFER"))
+  (:state (buffer '()) (count 0))
+  (push value buffer)
+  (incf count)
+  (when (= count n)
+    (emit (reverse buffer))
+    (setf buffer '() count 0)))
 
-(defun subject-drop (subject n)
+(define-subject-operator subject-drop (subject n)
   "Return a derived subject that ignores the first N source values and re-emits the
 rest. The push-side dual of STREAM-DROP."
-  (let ((result (make-subject))
-        (remaining n))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (if (plusp remaining)
-                             (decf remaining)
-                             (subject-emit result value))))
-    result))
+  (:state (remaining n))
+  (if (plusp remaining)
+      (decf remaining)
+      (emit value)))
 
-(defun subject-take-while (subject predicate)
+(define-subject-operator subject-take-while (subject predicate)
   "Return a derived subject that re-emits the leading run of source values
 satisfying PREDICATE and permanently stops at (and excluding) the first that does
 not."
-  (let ((result (make-subject))
-        (active t))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (when active
-                           (if (funcall predicate value)
-                               (subject-emit result value)
-                               (setf active nil)))))
-    result))
+  (:state (active t))
+  (when active
+    (if (funcall predicate value)
+        (emit value)
+        (setf active nil))))
 
-(defun subject-drop-while (subject predicate)
+(define-subject-operator subject-drop-while (subject predicate)
   "Return a derived subject that drops the leading run of source values satisfying
 PREDICATE, then re-emits every value from the first that does not onward."
-  (let ((result (make-subject))
-        (dropping t))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (unless (and dropping (funcall predicate value))
-                           (setf dropping nil)
-                           (subject-emit result value))))
-    result))
+  (:state (dropping t))
+  (unless (and dropping (funcall predicate value))
+    (setf dropping nil)
+    (emit value)))
 
-(defun subject-flat-map (subject function)
+(define-subject-operator subject-flat-map (subject function)
   "Return a derived subject that, for each value V of SUBJECT, calls FUNCTION to
 obtain an inner subject and forwards all of that inner subject's later emissions.
 The higher-order (flatten) reactive operator."
-  (let ((result (make-subject)))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (subject-subscribe (funcall function value)
-                                            (lambda (inner-value)
-                                              (subject-emit result inner-value)))))
-    result))
+  (subject-subscribe (funcall function value)
+                     (lambda (inner-value) (emit inner-value))))
 
 (defun subject-partition (subject predicate)
   "Return (VALUES MATCHING NON-MATCHING): two derived subjects that split SUBJECT's
@@ -189,14 +151,10 @@ on NON-MATCHING otherwise."
                              (subject-emit non-matching value))))
     (values matching non-matching)))
 
-(defun subject-count (subject)
+(define-subject-operator subject-count (subject)
   "Return a derived subject that emits the running count of source emissions
 (1, 2, 3, ...)."
-  (let ((result (make-subject))
-        (count 0))
-    (subject-subscribe subject
-                       (lambda (value)
-                         (declare (ignore value))
-                         (incf count)
-                         (subject-emit result count)))
-    result))
+  (:state (count 0))
+  (declare (ignore value))
+  (incf count)
+  (emit count))
