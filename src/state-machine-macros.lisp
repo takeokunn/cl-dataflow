@@ -1,41 +1,49 @@
 (in-package #:cl-dataflow)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun %macro-validate-option-list (options allowed-keys context)
-    (unless (evenp (length options))
-      (error 'invalid-input-error
-             :expected `(property-list ,allowed-keys)
-             :value options
-             :detail (format nil "~A options must be a property list."
-                             (%escaped-display-string context))))
-    (loop for (key nil) on options by #'cddr
-          do (unless (member key allowed-keys)
-               (error 'invalid-input-error
-                      :expected allowed-keys
-                      :value key
-                      :detail (format nil "Unsupported ~A option: ~S"
-                                      (%escaped-display-string context)
-                                      key)))))
+;;;; The DEFINE-STATE-MACHINE DSL macro: transition-clause parsing and
+;;;; validation, expanding into a MAKE-STATE-MACHINE call.
 
-  (defun %parse-state-machine-clause (clause)
-    (unless (and (listp clause) (>= (length clause) 3))
-      (error 'invalid-input-error
-             :expected '(from event to &key guard action metadata)
-             :value clause
-             :detail "DEFINE-STATE-MACHINE clauses require FROM EVENT TO."))
-    (destructuring-bind (from event to &rest options) clause
-      (%macro-validate-option-list options '(:guard :action :metadata)
-                                   "DEFINE-STATE-MACHINE transition")
-      `(make-transition ,from ,event ,to
-                        ,@options)))
+;;; --- DEFINE-STATE-MACHINE DSL schema (data) --------------------------------
 
-  (defun %parse-state-machine-definition (options clauses)
-    (%macro-validate-option-list options
-                                  '(:state :initial-state :history :history-limit :metadata)
-                                 "DEFINE-STATE-MACHINE")
-    `(make-state-machine
-      ,@options
-      :transitions (list ,@(mapcar #'%parse-state-machine-clause clauses)))))
+(defparameter +state-machine-transition-clause-options+ '(:guard :action :metadata))
+(defparameter +state-machine-definition-options+
+  '(:state :initial-state :history :history-limit :metadata))
+
+(defun %macro-validate-option-list (options allowed-keys context)
+  (unless (evenp (length options))
+    (error 'invalid-input-error
+           :expected `(property-list ,allowed-keys)
+           :value options
+           :detail (format nil "~A options must be a property list."
+                           (%escaped-display-string context))))
+  (loop for (key nil) on options by #'cddr
+        do (unless (member key allowed-keys)
+             (error 'invalid-input-error
+                    :expected allowed-keys
+                    :value key
+                    :detail (format nil "Unsupported ~A option: ~S"
+                                    (%escaped-display-string context)
+                                    key)))))
+
+(defun %parse-state-machine-clause (clause)
+  (unless (and (listp clause) (>= (length clause) 3))
+    (error 'invalid-input-error
+           :expected '(from event to &key guard action metadata)
+           :value clause
+           :detail "DEFINE-STATE-MACHINE clauses require FROM EVENT TO."))
+  (destructuring-bind (from event to &rest options) clause
+    (%macro-validate-option-list options +state-machine-transition-clause-options+
+                                 "DEFINE-STATE-MACHINE transition")
+    `(make-transition ,from ,event ,to
+                      ,@options)))
+
+(defun %parse-state-machine-definition (options clauses)
+  (%macro-validate-option-list options
+                                +state-machine-definition-options+
+                               "DEFINE-STATE-MACHINE")
+  `(make-state-machine
+    ,@options
+    :transitions (list ,@(mapcar #'%parse-state-machine-clause clauses))))
 
 (defmacro define-state-machine ((&rest options) &body clauses)
   (%parse-state-machine-definition options clauses))

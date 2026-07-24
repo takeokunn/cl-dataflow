@@ -142,6 +142,60 @@ higher value means NODE reaches the rest of the graph in fewer hops on average."
         0
         (/ (length distances) total))))
 
+(defun %betweenness-bfs (source names successors)
+  "Brandes' BFS phase from SOURCE over SUCCESSORS. Returns (VALUES STACK
+PREDECESSORS SIGMA): STACK holds every reached node in farthest-last visit
+order (so the accumulation phase can walk it farthest-first), PREDECESSORS
+maps each node to its shortest-path predecessors from SOURCE, and SIGMA counts
+the number of distinct shortest paths from SOURCE to each node."
+  (let* ((stack '())
+         (predecessors (%make-result-table))
+         (sigma (%make-result-table))
+         (distance (%make-result-table))
+         (queue (list source))
+         (tail queue))
+    (dolist (name names)
+      (setf (gethash name predecessors) '()
+            (gethash name sigma) 0
+            (gethash name distance) -1))
+    (setf (gethash source sigma) 1
+          (gethash source distance) 0)
+    (labels ((enqueue (value)
+               (let ((cell (list value)))
+                 (if queue
+                     (setf (cdr tail) cell
+                           tail cell)
+                     (setf queue cell
+                           tail cell)))))
+      (loop while queue do
+        (let ((v (pop queue)))
+          (push v stack)
+          (dolist (w (gethash v successors))
+            (when (< (gethash w distance) 0)
+              (setf (gethash w distance) (1+ (gethash v distance)))
+              (enqueue w))
+            (when (= (gethash w distance) (1+ (gethash v distance)))
+              (incf (gethash w sigma) (gethash v sigma))
+              (push v (gethash w predecessors)))))))
+    (values stack predecessors sigma)))
+
+(defun %betweenness-accumulate (source names stack predecessors sigma betweenness)
+  "Brandes' dependency-accumulation phase: fold one SOURCE's BFS (STACK,
+PREDECESSORS, SIGMA) into BETWEENNESS. Walking STACK farthest-first guarantees
+every node's own dependency total is finished before it contributes to its
+predecessors', so each node's share of the shortest paths through it is added
+to BETWEENNESS exactly once."
+  (let ((delta (%make-result-table)))
+    (dolist (name names)
+      (setf (gethash name delta) 0))
+    (dolist (w stack)
+      (dolist (v (gethash w predecessors))
+        (incf (gethash v delta)
+              (* (/ (gethash v sigma) (gethash w sigma))
+                 (+ 1 (gethash w delta)))))
+      (unless (equal w source)
+        (incf (gethash w betweenness) (gethash w delta))))))
+
 (defun graph-betweenness-centrality (graph)
   "Return an alist (NAME . SCORE) of unnormalised betweenness centrality: for each
 node, the total over all ordered source/target pairs of the fraction of shortest
@@ -154,88 +208,64 @@ deep graphs are safe). Ordered by name."
     (dolist (name names)
       (setf (gethash name betweenness) 0))
     (dolist (source names)
-      (let* ((stack '())
-             (predecessors (%make-result-table))
-             (sigma (%make-result-table))
-             (distance (%make-result-table))
-             (queue (list source))
-             (tail queue))
-        (dolist (name names)
-          (setf (gethash name predecessors) '()
-                (gethash name sigma) 0
-                (gethash name distance) -1))
-        (setf (gethash source sigma) 1
-              (gethash source distance) 0)
-        (labels ((enqueue (value)
-                   (let ((cell (list value)))
-                     (if queue
-                         (setf (cdr tail) cell
-                               tail cell)
-                         (setf queue cell
-                               tail cell)))))
-          (loop while queue do
-            (let ((v (pop queue)))
-              (push v stack)
-              (dolist (w (gethash v successors))
-                (when (< (gethash w distance) 0)
-                  (setf (gethash w distance) (1+ (gethash v distance)))
-                  (enqueue w))
-                (when (= (gethash w distance) (1+ (gethash v distance)))
-                  (incf (gethash w sigma) (gethash v sigma))
-                  (push v (gethash w predecessors)))))))
-        (let ((delta (%make-result-table)))
-          (dolist (name names)
-            (setf (gethash name delta) 0))
-          (dolist (w stack)
-            (dolist (v (gethash w predecessors))
-              (incf (gethash v delta)
-                    (* (/ (gethash v sigma) (gethash w sigma))
-                       (+ 1 (gethash w delta)))))
-            (unless (equal w source)
-              (incf (gethash w betweenness) (gethash w delta)))))))
+      (multiple-value-bind (stack predecessors sigma)
+          (%betweenness-bfs source names successors)
+        (%betweenness-accumulate source names stack predecessors sigma betweenness)))
     (sort (loop for name being the hash-keys of betweenness using (hash-value score)
                 collect (cons name score))
           #'string< :key #'car)))
 
-(defun graph-diameter (graph)
-  "Return the diameter of GRAPH: the largest eccentricity over all nodes -- the
+;;; --- Graph extremum-eccentricity metrics (data + macro) -------------------
+;;; DIAMETER/RADIUS report the extreme eccentricity VALUE over the graph;
+;;; CENTER/PERIPHERY report the NAMES whose eccentricity equals that extreme.
+;;; Both pairs share the same fold-over-%GRAPH-ECCENTRICITIES shape, differing
+;;; only in which comparator (#'MAX or #'MIN) picks the extremum, so each pair
+;;; is generated from a schema of (NAME COMPARATOR DOCSTRING) specs instead of
+;;; being hand-written per function.
+
+(defmacro define-graph-extremum-eccentricity (&body specs)
+  `(progn
+     ,@(mapcar (lambda (spec)
+                 (destructuring-bind (defun-name comparator docstring) spec
+                   `(defun ,defun-name (graph)
+                      ,docstring
+                      (let ((eccentricities (mapcar #'cdr (%graph-eccentricities graph))))
+                        (if eccentricities (reduce ,comparator eccentricities) 0)))))
+               specs)))
+
+(define-graph-extremum-eccentricity
+  (graph-diameter #'max
+   "Return the diameter of GRAPH: the largest eccentricity over all nodes -- the
 longest shortest-path distance between any reachable pair. 0 for a graph with no
-edges."
-  (let ((eccentricities (mapcar #'cdr (%graph-eccentricities graph))))
-    (if eccentricities
-        (reduce #'max eccentricities)
-        0)))
-
-(defun graph-radius (graph)
-  "Return the radius of GRAPH: the smallest eccentricity over all nodes. Under the
+edges.")
+  (graph-radius #'min
+   "Return the radius of GRAPH: the smallest eccentricity over all nodes. Under the
 directed, reaches-nothing-is-0 eccentricity convention (see GRAPH-ECCENTRICITY),
-any sink node makes the radius 0. 0 for a graph with no nodes."
-  (let ((eccentricities (mapcar #'cdr (%graph-eccentricities graph))))
-    (if eccentricities
-        (reduce #'min eccentricities)
-        0)))
+any sink node makes the radius 0. 0 for a graph with no nodes."))
 
-(defun graph-center (graph)
-  "Return the center of GRAPH: the names of the nodes whose eccentricity equals the
+(defmacro define-graph-extremum-eccentricity-names (&body specs)
+  `(progn
+     ,@(mapcar (lambda (spec)
+                 (destructuring-bind (defun-name comparator docstring) spec
+                   `(defun ,defun-name (graph)
+                      ,docstring
+                      (let ((eccentricities (%graph-eccentricities graph)))
+                        (when eccentricities
+                          (let ((extremum (reduce ,comparator eccentricities :key #'cdr)))
+                            (loop for (name . eccentricity) in eccentricities
+                                  when (= eccentricity extremum)
+                                  collect name)))))))
+               specs)))
+
+(define-graph-extremum-eccentricity-names
+  (graph-center #'min
+   "Return the center of GRAPH: the names of the nodes whose eccentricity equals the
 radius, ordered lexicographically. These are the nodes closest (in worst-case hops)
-to everything they reach. Empty for a graph with no nodes."
-  (let ((eccentricities (%graph-eccentricities graph)))
-    (when eccentricities
-      (let ((radius (reduce #'min eccentricities :key #'cdr)))
-        (loop for (name . eccentricity) in eccentricities
-              when (= eccentricity radius)
-              collect name)))))
-
-(defun graph-periphery (graph)
-  "Return the periphery of GRAPH: the names of the nodes whose eccentricity equals
+to everything they reach. Empty for a graph with no nodes.")
+  (graph-periphery #'max
+   "Return the periphery of GRAPH: the names of the nodes whose eccentricity equals
 the diameter, ordered lexicographically -- the most far-reaching nodes, those whose
-shortest paths stretch the whole diameter. Empty for a graph with no nodes."
-  (let ((eccentricities (%graph-eccentricities graph)))
-    (when eccentricities
-      (let ((diameter (reduce #'max eccentricities :key #'cdr)))
-        (loop for (name . eccentricity) in eccentricities
-              when (= eccentricity diameter)
-              collect name)))))
+shortest paths stretch the whole diameter. Empty for a graph with no nodes."))
 
 (defun %graph-distance-totals (graph)
   "Return (values SUM COUNT) over the shortest-path hop distances of every ordered
