@@ -420,32 +420,40 @@
         (let ((trace (context-trace-in-order context)))
           (is (eq (getf (fourth trace) :input) :pipeline-input))
           (is (equal (getf (car (last trace)) :input) seen-input)))))
-    (let* ((seen-input :not-run)
-            (graph (make-graph))
-            (source
-          (make-node
-            "source"
-            :handler
-            (lambda (input context)
-              (declare (ignore input context))
-              42)))
-            (sink
-          (make-node
-            "sink"
-            :inputs
-            (quote ("declared"))
-            :handler
-            (lambda (input context)
-              (declare (ignore context))
-              (setf seen-input input)
-              input))))
-      (add-node graph source)
-      (add-node graph sink)
-      (add-edge graph source sink :to-port "declared")
-      (let* ((pipeline (make-pipeline :graph graph :stages (list source sink)))
-              (original-plan (cl-dataflow::%pipeline-execution-plan pipeline))
-              (live-edge (first (cl-dataflow::%graph-edges-list (pipeline-graph pipeline)))))
-        (setf (edge-to-port live-edge) "undeclared")
-        (run-pipeline pipeline :input :pipeline-input)
-        (is (not (eq original-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
-        (is (null seen-input))))))
+    (let* ((source-value (list (cons "key" 42)))
+          (seen-input :not-run)
+          (graph (make-graph))
+          (source
+            (make-node
+              "source"
+              :handler
+              (lambda (input context)
+                (declare (ignore input context))
+                source-value)))
+          (sink
+            (make-node
+              "sink"
+              :inputs
+              (quote ("declared"))
+              :handler
+              (lambda (input context)
+                (declare (ignore context))
+                (setf seen-input input)
+                input))))
+  (add-node graph source)
+  (add-node graph sink)
+  (add-edge graph source sink :to-port "declared")
+  (let* ((pipeline (make-pipeline :graph graph :stages (list source sink)))
+          (original-plan (cl-dataflow::%pipeline-execution-plan pipeline))
+          (live-edge (first (cl-dataflow::%graph-edges-list (pipeline-graph pipeline))))
+          (context (make-context)))
+    (run-pipeline pipeline :input :pipeline-input :context context)
+    (is (eq seen-input (cl-dataflow::%read-value context source (edge-from-port live-edge))))
+    (is (eq seen-input (getf (first (cl-dataflow::%context-trace-list context)) :input)))
+    (setf source-value nil)
+    (run-pipeline pipeline :input :pipeline-input :context context)
+    (is (null seen-input))
+    (setf (edge-to-port live-edge) "undeclared")
+    (run-pipeline pipeline :input :pipeline-input)
+    (is (not (eq original-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
+    (is (null seen-input))))))

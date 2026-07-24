@@ -148,11 +148,15 @@
   (let* ((has-incoming-p (car input-binding-plan))
           (bindings (cdr input-binding-plan))
           (node-input
-        (cond
-          (bindings
-            (%collapse-single-binding-list (%resolve-input-binding-plan context bindings)))
-          (has-incoming-p nil)
-          (t (%node-input-binding node input))))
+            (cond
+              ((null bindings)
+              (if has-incoming-p nil (%node-input-binding node input)))
+              ((null (cdr bindings))
+              (let ((edge (cdar bindings)))
+                (%read-value context (edge-from edge) (edge-from-port edge))))
+              (t
+              (%collapse-single-binding-list
+                (%resolve-input-binding-plan context bindings)))))
           (output (funcall (node-handler node) node-input context))
           (output-bindings (%node-output-bindings node output)))
     (%record-node-run context node node-input output-bindings)
