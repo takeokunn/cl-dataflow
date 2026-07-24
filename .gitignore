@@ -34,3 +34,9 @@ system-index.txt
 
 # Coverage data file (regenerate with scripts/coverage.sh)
 /cl-dataflow.coverage
+
+# Nix build result symlink
+/result
+
+# cl-weave snapshot lock (transient; snapshots.sexp itself is tracked)
+__snapshots__/*.lock

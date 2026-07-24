@@ -3,15 +3,19 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.cl-prolog = {
-    url = "github:takeokunn/cl-prolog";
+    url = "github:nerima-lisp/cl-prolog";
     inputs.nixpkgs.follows = "nixpkgs";
   };
   inputs.cl-weave = {
-    url = "github:takeokunn/cl-weave";
+    url = "github:nerima-lisp/cl-weave";
     inputs.nixpkgs.follows = "nixpkgs";
   };
   inputs.paredit-cli = {
-    url = "github:takeokunn/paredit-cli";
+    url = "github:nerima-lisp/paredit-cli";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
+  inputs.cl-process-kit = {
+    url = "github:nerima-lisp/cl-process-kit";
     inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -22,6 +26,7 @@
       cl-prolog,
       cl-weave,
       paredit-cli,
+      cl-process-kit,
     }:
     let
       systems = [
@@ -72,7 +77,10 @@
           # "//" recursive marker in CL_SOURCE_REGISTRY discovers on every system.
           prologSource = "${cl-prolog.outPath}//";
           weave = cl-weave.packages.${system}.default;
-          sourceRegistry = "${prologSource}:${weave}/share/common-lisp/source//:$PWD//:";
+          # cl-process-kit's own package output has its .asd at the root (like
+          # cl-prolog's source tree), not nested under share/common-lisp/source.
+          processKit = cl-process-kit.packages.${system}.default;
+          sourceRegistry = "${prologSource}:${weave}/share/common-lisp/source//:${processKit}//:$PWD//:";
           mkWeaveCheck =
             {
               name,
@@ -144,11 +152,12 @@
         let
           system = pkgs.stdenv.hostPlatform.system;
           weave = cl-weave.packages.${system}.default;
+          processKit = cl-process-kit.packages.${system}.default;
           test = pkgs.writeShellApplication {
             name = "cl-dataflow-test";
             runtimeInputs = [ weave ];
             text = ''
-              export CL_SOURCE_REGISTRY="${cl-prolog.outPath}//:${weave}/share/common-lisp/source//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
+              export CL_SOURCE_REGISTRY="${cl-prolog.outPath}//:${weave}/share/common-lisp/source//:${processKit}//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
               exec cl-weave run cl-dataflow/test "$@"
             '';
           };
@@ -177,7 +186,7 @@
             shellHook = ''
               export CL_SOURCE_REGISTRY="${cl-prolog.outPath}//:${
                 cl-weave.packages.${system}.default
-              }/share/common-lisp/source//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
+              }/share/common-lisp/source//:${cl-process-kit.packages.${system}.default}//:$PWD//:''${CL_SOURCE_REGISTRY:-}"
             '';
           };
         }
