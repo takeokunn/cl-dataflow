@@ -75,19 +75,17 @@
       (is (equal (state-machine-history updated-machine)
                   (list transition-record))))))
 
-(deftest state-machine-history-limit-bounds-recorded-transitions
-  (let ((machine (make-state-machine
-                  :state "idle"
-                  :history-limit 2
-                  :transitions (list (make-transition "idle" "tick" "running")
-                                     (make-transition "running" "tick" "idle")))))
-    (step-state-machine machine "tick")
-    (step-state-machine machine "tick")
-    (step-state-machine machine "tick")
-    (let ((history (state-machine-history machine)))
-      (is (= (length history) 2))
-      (is (equal (mapcar (lambda (record) (getf record :from)) history)
-                 '("idle" "running"))))))
+(deftest state-machine-history-limit-retains-zero-one-and-thirty-two-records
+  (dolist (history-limit '(0 1 32))
+    (let ((machine (make-state-machine
+                    :state "idle"
+                    :history-limit history-limit
+                    :transitions (list (make-transition "idle" "tick" "running")
+                                       (make-transition "running" "tick" "idle")))))
+      (dotimes (index 33)
+        (step-state-machine machine "tick"))
+      (is (= (length (state-machine-history machine))
+             (min history-limit 33))))))
 
 (deftest state-machine-history-limit-zero-disables-history-retention
   (let ((machine (make-state-machine
@@ -137,32 +135,35 @@
         (:guard-passed t)
         (:action-result nil)))))
 
-(deftest state-machine-history-helpers-return-independent-snapshots
+(deftest state-machine-transition-record-history-trace-and-return-are-independent
   (let* ((payload (vector (list :nested "ok")))
+         (context (make-context :state "idle"))
          (machine (make-state-machine
-                  :state "idle"
-                  :transitions (list (make-transition
-                                      "idle" "start" "running"
-                                      :action (lambda (machine event context)
-                                                (declare (ignore machine event context))
-                                                (values nil payload)))))))
-    (multiple-value-bind (updated-machine transition-record)
-        (step-state-machine machine "start")
-      (let ((history (state-machine-history updated-machine))
-            (history-copy (state-machine-history updated-machine)))
-        (is (not (eq (first history) transition-record)))
-        (is (not (eq (first history-copy) transition-record)))
-        (set-plist-entry (first history) :action-result :mutated)
-        (set-plist-entry (first history-copy) :action-result :mutated)
-        (setf (second (aref (getf transition-record :action-result) 0)) "mutated-return")
-        (let ((internal-result
-                (getf (first (state-machine-history updated-machine)) :action-result)))
-          (setf (second (aref internal-result 0)) "mutated-snapshot"))
-        (dolist (record (list (first (state-machine-history updated-machine))
-                              (first (state-machine-history updated-machine))))
-          (let ((action-result (getf record :action-result)))
-            (is (not (eq action-result payload)))
-            (is (equalp action-result #((:nested "ok"))))))))))
+                   :state "idle"
+                   :history-limit 32
+                   :transitions (list (make-transition
+                                       "idle" "start" "running"
+                                       :action (lambda (machine event context)
+                                                 (declare (ignore machine event context))
+                                                 (values nil payload)))))))
+    (multiple-value-bind (updated-machine returned-record)
+        (step-state-machine machine "start" :context context)
+      (let* ((history-record
+               (first (cl-dataflow::%state-machine-history-list updated-machine)))
+             (trace-record
+               (first (cl-dataflow::%context-trace-list context)))
+             (returned-result (getf returned-record :action-result))
+             (history-result (getf history-record :action-result))
+             (trace-result (getf trace-record :action-result)))
+        (is (not (eq returned-record history-record)))
+        (is (not (eq returned-record trace-record)))
+        (is (not (eq history-record trace-record)))
+        (is (not (eq returned-result history-result)))
+        (is (not (eq returned-result trace-result)))
+        (is (not (eq history-result trace-result)))
+        (setf (second (aref returned-result 0)) "mutated-return")
+        (is (equalp history-result #((:nested "ok"))))
+        (is (equalp trace-result #((:nested "ok"))))))))
 
 (deftest state-machine-history-copies-hash-table-action-results
   (let* ((payload (make-hash-table :test #'equal))

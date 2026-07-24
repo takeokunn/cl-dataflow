@@ -64,12 +64,15 @@
         :action-result (%copy-structured-value action-result)))
 
 (defun %record-transition-history (machine transition-record)
+  ;; Takes ownership of TRANSITION-RECORD: %COMMIT-TRANSITION/CPS builds it fresh
+  ;; and hands independent copies to the trace and the caller, so history can
+  ;; store this one directly without a further copy.
   (let ((history-limit (state-machine-history-limit machine)))
     (setf (slot-value machine 'history)
           (%trim-transition-history
            (if (eql history-limit 0)
                '()
-               (cons (%copy-transition-record transition-record)
+               (cons transition-record
                      (%state-machine-history-list machine)))
            history-limit))))
 
