@@ -10,40 +10,43 @@
             (%remap-pipeline-stages copied-graph (or stages (topological-sort graph))))))
       (stages (%build-sequential-graph stages))
       (t (values (make-graph) '()))))
+  (defun %copy-pipeline-stage-ports (ports)
+    (mapcar (function copy-seq) ports))
+  (defun %make-pipeline-stage-signature (stage)
+    (make-instance
+      (quote pipeline-stage-signature)
+      :node stage
+      :name (copy-seq (node-name stage))
+      :inputs (%copy-pipeline-stage-ports (%node-inputs-list stage))
+      :outputs (%copy-pipeline-stage-ports (%node-outputs-list stage))))
   (defun %make-pipeline-edge-signature (edge)
     (make-instance
-      'pipeline-edge-signature
-      :edge
-      edge
-      :from
-      (%copy-structured-value (edge-from edge))
-      :from-port
-      (%copy-structured-value (edge-from-port edge))
-      :to
-      (%copy-structured-value (edge-to edge))
-      :to-port
-      (%copy-structured-value (edge-to-port edge))))
+      (quote pipeline-edge-signature)
+      :edge edge
+      :from (%copy-structured-value (edge-from edge))
+      :from-port (%copy-structured-value (edge-from-port edge))
+      :to (%copy-structured-value (edge-to edge))
+      :to-port (%copy-structured-value (edge-to-port edge))))
   (defun %make-pipeline-execution-plan (graph stages)
-    (let ((incoming-index (%incoming-edges-index graph)))
-      (make-instance
-        (quote pipeline-execution-plan)
-        :graph
-        graph
-        :stages
-        stages
-        :incoming-index
-        incoming-index
-        :input-binding-plans
-        (loop for node in stages
-              for incoming-edges = (gethash (node-name node) incoming-index)
-              collect (cons
-            (not (endp incoming-edges))
-            (%node-input-binding-plan node incoming-edges)))
-        :sinks
-        (%sink-nodes-in-order graph stages)
-        :edge-signatures
-        (loop for edge in (%graph-edges-list graph)
-              collect (%make-pipeline-edge-signature edge)))))
+  (let ((incoming-index (%incoming-edges-index graph)))
+    (make-instance
+      (quote pipeline-execution-plan)
+      :graph graph
+      :stages stages
+      :stage-signatures
+      (loop for stage in stages
+            collect (%make-pipeline-stage-signature stage))
+      :incoming-index incoming-index
+      :input-binding-plans
+      (loop for node in stages
+            for incoming-edges = (gethash (node-name node) incoming-index)
+            collect (cons
+                      (not (endp incoming-edges))
+                      (%node-input-binding-plan node incoming-edges)))
+      :sinks (%sink-nodes-in-order graph stages)
+      :edge-signatures
+      (loop for edge in (%graph-edges-list graph)
+            collect (%make-pipeline-edge-signature edge)))))
   (defun %pipeline-edge-signature-current-p (edge signature)
     (and
       (eq edge (%pipeline-edge-signature-edge signature))
@@ -51,28 +54,45 @@
       (equal (edge-from-port edge) (%pipeline-edge-signature-from-port signature))
       (equal (edge-to edge) (%pipeline-edge-signature-to signature))
       (equal (edge-to-port edge) (%pipeline-edge-signature-to-port signature))))
-  (defun %pipeline-stage-list-current-p (graph stages)
-    (loop for stage in stages
-          always (eq stage (find-node graph (node-name stage)))))
-  (defun %pipeline-edge-signatures-current-p (edges signatures)
-    (do ((remaining-edges edges (cdr remaining-edges))
-          (remaining-signatures signatures (cdr remaining-signatures)))
-      ((or (endp remaining-edges) (endp remaining-signatures))
-        (and (endp remaining-edges) (endp remaining-signatures)))
-      (unless (%pipeline-edge-signature-current-p
-          (car remaining-edges)
-          (car remaining-signatures))
-        (return nil))))
-  (defun %pipeline-execution-plan-current-p (pipeline plan)
+  (defun %pipeline-stage-signature-current-p (graph stage signature)
     (and
-      plan
-      (let ((graph (pipeline-graph pipeline)))
-        (and
-          (eq graph (%pipeline-execution-plan-graph plan))
-          (%pipeline-stage-list-current-p graph (%pipeline-execution-plan-stages plan))
-          (%pipeline-edge-signatures-current-p
-            (%graph-edges-list graph)
-            (%pipeline-execution-plan-edge-signatures plan))))))
+      (eq stage (%pipeline-stage-signature-node signature))
+      (equal (node-name stage) (%pipeline-stage-signature-name signature))
+      (equal (%node-inputs-list stage) (%pipeline-stage-signature-inputs signature))
+      (equal (%node-outputs-list stage) (%pipeline-stage-signature-outputs signature))
+      (eq stage (find-node graph (node-name stage)))))
+  (defun %pipeline-stage-signatures-current-p (graph stages signatures)
+  (do ((remaining-stages stages (cdr remaining-stages))
+      (remaining-signatures signatures (cdr remaining-signatures)))
+    ((or (endp remaining-stages) (endp remaining-signatures))
+      (and (endp remaining-stages) (endp remaining-signatures)))
+    (unless (%pipeline-stage-signature-current-p
+        graph
+        (car remaining-stages)
+        (car remaining-signatures))
+      (return nil))))
+  (defun %pipeline-edge-signatures-current-p (edges signatures)
+  (do ((remaining-edges edges (cdr remaining-edges))
+      (remaining-signatures signatures (cdr remaining-signatures)))
+    ((or (endp remaining-edges) (endp remaining-signatures))
+      (and (endp remaining-edges) (endp remaining-signatures)))
+    (unless (%pipeline-edge-signature-current-p
+        (car remaining-edges)
+        (car remaining-signatures))
+      (return nil))))
+  (defun %pipeline-execution-plan-current-p (pipeline plan)
+  (and
+    plan
+    (let ((graph (pipeline-graph pipeline)))
+      (and
+        (eq graph (%pipeline-execution-plan-graph plan))
+        (%pipeline-stage-signatures-current-p
+          graph
+          (%pipeline-execution-plan-stages plan)
+          (%pipeline-execution-plan-stage-signatures plan))
+        (%pipeline-edge-signatures-current-p
+          (%graph-edges-list graph)
+          (%pipeline-execution-plan-edge-signatures plan))))))
   (defun %rebuild-pipeline-execution-plan (pipeline)
     (let* ((graph (pipeline-graph pipeline))
             (stages (%remap-pipeline-stages graph (%pipeline-stages-list pipeline)))
@@ -84,8 +104,7 @@
     (let ((plan (%pipeline-execution-plan pipeline)))
       (if (%pipeline-execution-plan-current-p pipeline plan) plan
         (%rebuild-pipeline-execution-plan pipeline)))))
-
-(defun make-pipeline (&key graph stages metadata)
+  (defun make-pipeline (&key graph stages metadata)
   (multiple-value-bind (resolved-graph resolved-stages) (%build-pipeline-graph graph stages)
     (validate-graph resolved-graph)
     (let ((internal-stages (copy-list resolved-stages)))

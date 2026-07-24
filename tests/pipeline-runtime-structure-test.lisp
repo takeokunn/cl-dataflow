@@ -333,7 +333,7 @@
       (is (string= (node-name (node-not-found-designator condition)) "renamed")))))
 
 (progn
-  (deftest
+(deftest
     pipeline-setter-and-copy-isolate-execution-plans
     (with-linear-test-pipeline
       (graph pipeline source sink)
@@ -354,7 +354,7 @@
                 (cl-dataflow::%pipeline-execution-plan-graph
                   (cl-dataflow::%pipeline-execution-plan pipeline))
                 (cl-dataflow::%pipeline-execution-plan-graph
-                  (cl-dataflow::%pipeline-execution-plan copy)))))))))
+                  (cl-dataflow::%pipeline-execution-plan copy))))))))
   (deftest
     pipeline-plan-caches-input-bindings-and-resolves-current-values
     (let* ((old-value 1)
@@ -457,3 +457,98 @@
     (run-pipeline pipeline :input :pipeline-input)
     (is (not (eq original-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
     (is (null seen-input))))))
+(deftest
+  pipeline-rebuilds-plan-after-node-inputs-setter
+  (let* ((graph (make-graph))
+        (seen-input :not-run)
+        (source
+        (make-node
+          "source"
+          :outputs
+          (quote ("value"))
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            42)))
+        (sink
+        (make-node
+          "sink"
+          :inputs
+          (quote ("value"))
+          :handler
+          (lambda (input context)
+            (declare (ignore context))
+            (setf seen-input input)
+            input))))
+    (add-node graph source)
+    (add-node graph sink)
+    (add-edge graph source sink :from-port "value" :to-port "value")
+    (let* ((pipeline (make-pipeline :graph graph :stages (list source sink)))
+          (old-plan (cl-dataflow::%pipeline-execution-plan pipeline)))
+      (is (= (run-pipeline pipeline) 42))
+      (is (= seen-input 42))
+      (setf seen-input :not-run)
+      (setf (node-inputs (find-node (pipeline-graph pipeline) "sink")) (quote ("other")))
+      (is (null (run-pipeline pipeline :input :pipeline-input)))
+      (is (null seen-input))
+      (is (not (eq old-plan (cl-dataflow::%pipeline-execution-plan pipeline)))))))
+
+(deftest
+  pipeline-rebuilds-plan-after-node-outputs-setter
+  (let* ((graph (make-graph))
+        (sink
+        (make-node
+          "sink"
+          :outputs
+          (quote ("left"))
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            (quote (("left" . 1) ("right" . 2)))))))
+    (add-node graph sink)
+    (let* ((pipeline (make-pipeline :graph graph :stages (list sink)))
+          (old-plan (cl-dataflow::%pipeline-execution-plan pipeline)))
+      (is (= (run-pipeline pipeline) 1))
+      (setf (node-outputs (find-node (pipeline-graph pipeline) "sink")) (quote ("right")))
+      (is (= (run-pipeline pipeline) 2))
+      (is (not (eq old-plan (cl-dataflow::%pipeline-execution-plan pipeline)))))))
+
+(deftest
+  pipeline-rebuilds-plan-after-mutating-setter-port-string
+  (let* ((graph (make-graph))
+        (seen-input :not-run)
+        (source
+        (make-node
+          "source"
+          :outputs
+          (quote ("value"))
+          :handler
+          (lambda (input context)
+            (declare (ignore input context))
+            42)))
+        (sink
+        (make-node
+          "sink"
+          :inputs
+          (quote ("value"))
+          :handler
+          (lambda (input context)
+            (declare (ignore context))
+            (setf seen-input input)
+            input))))
+    (add-node graph source)
+    (add-node graph sink)
+    (add-edge graph source sink :from-port "value" :to-port "value")
+    (let* ((pipeline (make-pipeline :graph graph :stages (list source sink)))
+          (live-sink (find-node (pipeline-graph pipeline) "sink"))
+          (port (copy-seq "value")))
+      (setf (node-inputs live-sink) (list port))
+      (let ((old-plan (cl-dataflow::%ensure-pipeline-execution-plan pipeline)))
+        (is (= (run-pipeline pipeline) 42))
+        (is (= seen-input 42))
+        (setf seen-input :not-run)
+        (setf (char port 0) #\x)
+        (is (null (run-pipeline pipeline :input :pipeline-input)))
+        (is (null seen-input))
+        (is (not (eq old-plan (cl-dataflow::%pipeline-execution-plan pipeline))))))))
+)
