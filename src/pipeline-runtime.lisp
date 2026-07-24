@@ -24,19 +24,26 @@
       :to-port
       (%copy-structured-value (edge-to-port edge))))
   (defun %make-pipeline-execution-plan (graph stages)
-    (make-instance
-      'pipeline-execution-plan
-      :graph
-      graph
-      :stages
-      stages
-      :incoming-index
-      (%incoming-edges-index graph)
-      :sinks
-      (%sink-nodes-in-order graph stages)
-      :edge-signatures
-      (loop for edge in (%graph-edges-list graph)
-            collect (%make-pipeline-edge-signature edge))))
+    (let ((incoming-index (%incoming-edges-index graph)))
+      (make-instance
+        (quote pipeline-execution-plan)
+        :graph
+        graph
+        :stages
+        stages
+        :incoming-index
+        incoming-index
+        :input-binding-plans
+        (loop for node in stages
+              for incoming-edges = (gethash (node-name node) incoming-index)
+              collect (cons
+            (not (endp incoming-edges))
+            (%node-input-binding-plan node incoming-edges)))
+        :sinks
+        (%sink-nodes-in-order graph stages)
+        :edge-signatures
+        (loop for edge in (%graph-edges-list graph)
+              collect (%make-pipeline-edge-signature edge)))))
   (defun %pipeline-edge-signature-current-p (edge signature)
     (and
       (eq edge (%pipeline-edge-signature-edge signature))
@@ -137,11 +144,18 @@
     (%make-node-trace-record node node-input bindings)
     (%context-trace-list context)))
 
-(defun %run-node/cps (context graph node input incoming-index continuation)
-  (let* ((node-input (%collect-node-inputs context graph node input incoming-index))
+(defun %run-node/cps (context node input input-binding-plan continuation)
+  (let* ((has-incoming-p (car input-binding-plan))
+          (bindings (cdr input-binding-plan))
+          (node-input
+        (cond
+          (bindings
+            (%collapse-single-binding-list (%resolve-input-binding-plan context bindings)))
+          (has-incoming-p nil)
+          (t (%node-input-binding node input))))
           (output (funcall (node-handler node) node-input context))
-          (bindings (%node-output-bindings node output)))
-    (%record-node-run context node node-input bindings)
+          (output-bindings (%node-output-bindings node output)))
+    (%record-node-run context node node-input output-bindings)
     (funcall continuation output)))
 
 (defun %finalize-pipeline-run (context sink-nodes)
@@ -151,34 +165,31 @@
 (defun %ensure-pipeline-context (context)
   (or context (make-context)))
 
-(defun %run-pipeline-stages/cps (context graph order sink-nodes input incoming-index continuation)
-  (labels ((advance-stages (remaining)
+(defun %run-pipeline-stages/cps (context order sink-nodes input input-binding-plans continuation)
+  (labels ((advance-stages (remaining remaining-binding-plans)
               (if (endp remaining) (funcall continuation (%finalize-pipeline-run context sink-nodes))
           (%run-node/cps
             context
-            graph
             (first remaining)
             input
-            incoming-index
+            (first remaining-binding-plans)
             (lambda (output)
               (declare (ignore output))
-              (advance-stages (rest remaining)))))))
-    (advance-stages order)))
+              (advance-stages (rest remaining) (rest remaining-binding-plans)))))))
+    (advance-stages order input-binding-plans)))
 
 (defun run-pipeline (pipeline &key input context)
   (let* ((plan (%ensure-pipeline-execution-plan pipeline))
-          (graph (%pipeline-execution-plan-graph plan))
           (ctx (%ensure-pipeline-context context))
           (order (%pipeline-execution-plan-stages plan))
           (sink-nodes (%pipeline-execution-plan-sinks plan))
-          (incoming-index (%pipeline-execution-plan-incoming-index plan)))
+          (input-binding-plans (%pipeline-execution-plan-input-binding-plans plan)))
     (%run-pipeline-stages/cps
       ctx
-      graph
       order
       sink-nodes
       input
-      incoming-index
+      input-binding-plans
       (lambda (result)
         result))))
 

@@ -35,15 +35,21 @@ insertion order silently deciding it the other way."
       (unless (gethash (edge-to-port edge) bindings)
         (setf (gethash (edge-to-port edge) bindings) edge)))))
 
-(defun %incoming-edge-bindings (context node incoming-edges)
+(defun %node-input-binding-plan (node incoming-edges)
   (let ((binding-table (%edge-binding-table incoming-edges)))
-    (let ((bindings '()))
-      (dolist (port (%node-inputs-list node) (nreverse bindings))
-        (let ((edge (gethash port binding-table)))
-          (when edge
-            (push
-              (cons port (%read-value context (edge-from edge) (edge-from-port edge)))
-              bindings)))))))
+    (loop for port in (%node-inputs-list node)
+          for edge = (gethash port binding-table)
+          when edge
+            collect (cons port edge))))
+
+(defun %resolve-input-binding-plan (context binding-plan)
+  (loop for (port . edge) in binding-plan
+        collect (cons port (%read-value context (edge-from edge) (edge-from-port edge)))))
+
+(defun %incoming-edge-bindings (context node incoming-edges)
+  (%resolve-input-binding-plan
+    context
+    (%node-input-binding-plan node incoming-edges)))
 
 (defun %collect-node-inputs (context graph node input &optional incoming-index)
   (let ((incoming

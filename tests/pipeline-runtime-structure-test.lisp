@@ -332,25 +332,120 @@
       (cl-dataflow::%ensure-pipeline-execution-plan pipeline)
       (is (string= (node-name (node-not-found-designator condition)) "renamed")))))
 
-(deftest
-  pipeline-setter-and-copy-isolate-execution-plans
-  (with-linear-test-pipeline
-    (graph pipeline source sink)
-    (let ((original-plan (cl-dataflow::%pipeline-execution-plan pipeline)))
-      (setf (pipeline-stages pipeline) (pipeline-stages pipeline))
-      (is (null (cl-dataflow::%pipeline-execution-plan pipeline)))
-      (cl-dataflow::%ensure-pipeline-execution-plan pipeline)
-      (is (not (eq original-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
-      (let ((copy (copy-pipeline pipeline)))
+(progn
+  (deftest
+    pipeline-setter-and-copy-isolate-execution-plans
+    (with-linear-test-pipeline
+      (graph pipeline source sink)
+      (let ((original-plan (cl-dataflow::%pipeline-execution-plan pipeline)))
+        (setf (pipeline-stages pipeline) (pipeline-stages pipeline))
+        (is (null (cl-dataflow::%pipeline-execution-plan pipeline)))
+        (cl-dataflow::%ensure-pipeline-execution-plan pipeline)
+        (is (not (eq original-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
+        (let ((copy (copy-pipeline pipeline)))
+          (is
+            (not
+              (eq
+                (cl-dataflow::%pipeline-execution-plan pipeline)
+                (cl-dataflow::%pipeline-execution-plan copy))))
+          (is
+            (not
+              (eq
+                (cl-dataflow::%pipeline-execution-plan-graph
+                  (cl-dataflow::%pipeline-execution-plan pipeline))
+                (cl-dataflow::%pipeline-execution-plan-graph
+                  (cl-dataflow::%pipeline-execution-plan copy)))))))))
+  (deftest
+    pipeline-plan-caches-input-bindings-and-resolves-current-values
+    (let* ((old-value 1)
+            (new-value 2)
+            (seen-input nil)
+            (graph (make-graph))
+            (old-source
+          (make-node
+            "old"
+            :outputs
+            (quote ("right"))
+            :handler
+            (lambda (input context)
+              (declare (ignore input context))
+              old-value)))
+            (new-source
+          (make-node
+            "new"
+            :outputs
+            (quote ("left"))
+            :handler
+            (lambda (input context)
+              (declare (ignore input context))
+              new-value)))
+            (sink
+          (make-node
+            "sink"
+            :inputs
+            (quote ("right" "left"))
+            :handler
+            (lambda (input context)
+              (declare (ignore context))
+              (setf seen-input input)
+              input))))
+      (dolist (node (list old-source new-source sink))
+        (add-node graph node))
+      (add-edge graph old-source sink :from-port "right" :to-port "left")
+      (add-edge graph new-source sink :from-port "left" :to-port "left")
+      (add-edge graph old-source sink :from-port "right" :to-port "right")
+      (let* ((pipeline
+            (make-pipeline :graph graph :stages (list old-source new-source sink)))
+              (plan (cl-dataflow::%pipeline-execution-plan pipeline))
+              (binding-plans (cl-dataflow::%pipeline-execution-plan-input-binding-plans plan))
+              (sink-plan (cdr (third binding-plans)))
+              (context (make-context)))
+        (is (equal (first binding-plans) (quote (nil))))
+        (is (equal (second binding-plans) (quote (nil))))
+        (is (equal (mapcar (function car) sink-plan) (quote ("right" "left"))))
         (is
-          (not
-            (eq
-              (cl-dataflow::%pipeline-execution-plan pipeline)
-              (cl-dataflow::%pipeline-execution-plan copy))))
-        (is
-          (not
-            (eq
-              (cl-dataflow::%pipeline-execution-plan-graph
-                (cl-dataflow::%pipeline-execution-plan pipeline))
-              (cl-dataflow::%pipeline-execution-plan-graph
-                (cl-dataflow::%pipeline-execution-plan copy)))))))))
+          (equal
+            (mapcar
+              (lambda (binding)
+                (edge-from (cdr binding)))
+              sink-plan)
+            (quote ("old" "new"))))
+        (run-pipeline pipeline :input :pipeline-input :context context)
+        (is (equal seen-input (quote (("right" . 1) ("left" . 2)))))
+        (setf old-value 10
+              new-value 20)
+        (run-pipeline pipeline :input :pipeline-input :context context)
+        (is (eq plan (cl-dataflow::%pipeline-execution-plan pipeline)))
+        (is (equal seen-input (quote (("right" . 10) ("left" . 20)))))
+        (let ((trace (context-trace-in-order context)))
+          (is (eq (getf (fourth trace) :input) :pipeline-input))
+          (is (equal (getf (car (last trace)) :input) seen-input)))))
+    (let* ((seen-input :not-run)
+            (graph (make-graph))
+            (source
+          (make-node
+            "source"
+            :handler
+            (lambda (input context)
+              (declare (ignore input context))
+              42)))
+            (sink
+          (make-node
+            "sink"
+            :inputs
+            (quote ("declared"))
+            :handler
+            (lambda (input context)
+              (declare (ignore context))
+              (setf seen-input input)
+              input))))
+      (add-node graph source)
+      (add-node graph sink)
+      (add-edge graph source sink :to-port "declared")
+      (let* ((pipeline (make-pipeline :graph graph :stages (list source sink)))
+              (original-plan (cl-dataflow::%pipeline-execution-plan pipeline))
+              (live-edge (first (cl-dataflow::%graph-edges-list (pipeline-graph pipeline)))))
+        (setf (edge-to-port live-edge) "undeclared")
+        (run-pipeline pipeline :input :pipeline-input)
+        (is (not (eq original-plan (cl-dataflow::%pipeline-execution-plan pipeline))))
+        (is (null seen-input))))))

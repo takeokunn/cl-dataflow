@@ -78,6 +78,11 @@
         :incoming-index
         :reader
         %pipeline-execution-plan-incoming-index)
+      (input-binding-plans
+        :initarg
+        :input-binding-plans
+        :reader
+        %pipeline-execution-plan-input-binding-plans)
       (sinks :initarg :sinks :reader %pipeline-execution-plan-sinks)
       (edge-signatures
         :initarg
