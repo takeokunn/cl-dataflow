@@ -230,7 +230,7 @@
     context
     (%make-node-trace-record node node-input bindings)))
 
-(defun %run-node/cps (context node input input-key-plan output-key-plan continuation)
+(defun %run-node (context node input input-key-plan output-key-plan)
   (let* ((has-incoming-p (car input-key-plan))
           (bindings (cdr input-key-plan))
           (node-input
@@ -244,34 +244,18 @@
           (output-bindings
         (%node-output-bindings node output (mapcar (function car) output-key-plan))))
     (%record-node-run context node node-input output-bindings output-key-plan)
-    (funcall continuation output)))
+    output))
 
 (defun %finalize-pipeline-run (context sink-result-plans)
   (setf (context-result context) (%collect-cached-sink-results context sink-result-plans))
   (context-result context))
 
-(defun %run-pipeline-stages/cps (context
-    order
-    sink-result-plans
-    input
-    input-key-plans
-    output-key-plans
-    continuation)
-  (labels ((advance-stages (remaining remaining-input-key-plans remaining-output-key-plans)
-              (if (endp remaining) (funcall continuation (%finalize-pipeline-run context sink-result-plans))
-          (%run-node/cps
-            context
-            (first remaining)
-            input
-            (first remaining-input-key-plans)
-            (first remaining-output-key-plans)
-            (lambda (output)
-              (declare (ignore output))
-              (advance-stages
-                (rest remaining)
-                (rest remaining-input-key-plans)
-                (rest remaining-output-key-plans)))))))
-    (advance-stages order input-key-plans output-key-plans)))
+(defun %run-pipeline-stages (context order sink-result-plans input input-key-plans output-key-plans)
+  (loop for node in order
+        for input-key-plan in input-key-plans
+        for output-key-plan in output-key-plans
+        do (%run-node context node input input-key-plan output-key-plan))
+  (%finalize-pipeline-run context sink-result-plans))
 
 (progn
   (defun %ensure-pipeline-context (context)
@@ -283,15 +267,13 @@
             (sink-result-plans (%pipeline-execution-plan-sink-result-plans plan))
             (input-key-plans (%pipeline-execution-plan-input-key-plans plan))
             (output-key-plans (%pipeline-execution-plan-output-key-plans plan)))
-      (%run-pipeline-stages/cps
+      (%run-pipeline-stages
         ctx
         order
         sink-result-plans
         input
         input-key-plans
-        output-key-plans
-        (lambda (result)
-          result))))
+        output-key-plans)))
   (defun run-pipeline-with-context (pipeline &key input context)
     (let ((ctx (%ensure-pipeline-context context)))
       (values (run-pipeline pipeline :input input :context ctx) ctx))))
