@@ -8,31 +8,17 @@
   "Return the 0-based index of the first element of STREAM satisfying PREDICATE, or
 NIL when none does. LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-FIND-INDEX")
-  (let ((index 0)
-        (current stream))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return nil))
-        (when (and limit (= index limit))
-          (%signal-stream-limit-exceeded "STREAM-FIND-INDEX" limit))
-        (when (funcall predicate (car step)) (return index))
-        (incf index)
-        (setf current (cdr step))))))
+  (let ((index 0))
+    (do-stream (element stream :limit limit :caller "STREAM-FIND-INDEX" :on-end nil)
+      (when (funcall predicate element) (return index))
+      (incf index))))
 
 (defun stream-none-p (predicate stream &key limit)
   "Return true when no element of STREAM satisfies PREDICATE (true for an empty
 stream). LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-NONE-P")
-  (let ((current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return t))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-NONE-P" limit))
-        (when (funcall predicate (car step)) (return nil))
-        (incf count)
-        (setf current (cdr step))))))
+  (do-stream (element stream :limit limit :caller "STREAM-NONE-P" :on-end t)
+    (when (funcall predicate element) (return nil))))
 
 (defun stream-mode (stream &key (test 'equal) limit)
   "Return the most frequently occurring element of STREAM (the first-seen element
@@ -40,21 +26,12 @@ wins ties), or NIL when STREAM is empty. TEST is the hash-table equality used to
 group elements. LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-MODE")
   (let ((counts (make-hash-table :test test))
-        (order '())
-        (current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-MODE" limit))
-        (let ((element (car step)))
-          (unless (nth-value 1 (gethash element counts))
-            (push element order)
-            (setf (gethash element counts) 0))
-          (incf (gethash element counts)))
-        (incf count)
-        (setf current (cdr step))))
+        (order '()))
+    (do-stream (element stream :limit limit :caller "STREAM-MODE" :on-end nil)
+      (unless (nth-value 1 (gethash element counts))
+        (push element order)
+        (setf (gethash element counts) 0))
+      (incf (gethash element counts)))
     (let ((best nil)
           (best-count -1))
       (dolist (element (nreverse order) best)

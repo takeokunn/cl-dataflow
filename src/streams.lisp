@@ -256,6 +256,27 @@ side effect as the element passes through."
 
 ;;; --- Consumers (stream -> value) -----------------------------------------
 
+(defmacro do-stream ((element stream &key limit caller on-end) &body body)
+  "Iterate ELEMENT over the elements of STREAM in order, driving %STREAM-STEP one
+element at a time. When LIMIT is non-NIL, exceeding it signals
+INVALID-INPUT-ERROR by way of %SIGNAL-STREAM-LIMIT-EXCEEDED naming CALLER. Once
+the stream is exhausted the form evaluates to ON-END; BODY may (RETURN value)
+to stop early with a different value instead."
+  (let ((current (gensym "CURRENT"))
+        (step (gensym "STEP"))
+        (count (gensym "COUNT")))
+    `(let ((,current ,stream)
+           (,count 0))
+       (loop
+         (let ((,step (%stream-step ,current)))
+           (when (eq ,step :end) (return ,on-end))
+           (when (and ,limit (= ,count ,limit))
+             (%signal-stream-limit-exceeded ,caller ,limit))
+           (let ((,element (car ,step)))
+             ,@body)
+           (incf ,count)
+           (setf ,current (cdr ,step)))))))
+
 (defun stream-collect (stream &key limit (on-limit :error))
   "Force STREAM and return its elements as a fresh list.
 LIMIT bounds the number of elements accepted. ON-LIMIT is :ERROR (signal when the
@@ -281,46 +302,25 @@ elements without forcing more input)."
   "Fold STREAM left to right under FUNCTION starting from SEED, returning the final
 accumulator. LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-REDUCE")
-  (let ((accumulator seed)
-        (current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return accumulator))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-REDUCE" limit))
-        (setf accumulator (funcall function accumulator (car step)))
-        (incf count)
-        (setf current (cdr step))))))
+  (let ((accumulator seed))
+    (do-stream (element stream :limit limit :caller "STREAM-REDUCE" :on-end accumulator)
+      (setf accumulator (funcall function accumulator element)))))
 
 (defun stream-for-each (function stream &key limit)
   "Call FUNCTION on each element of STREAM for its side effect. Returns no values.
 LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-FOR-EACH")
-  (let ((current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return (values)))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-FOR-EACH" limit))
-        (funcall function (car step))
-        (incf count)
-        (setf current (cdr step))))))
+  (do-stream (element stream :limit limit :caller "STREAM-FOR-EACH" :on-end (values))
+    (funcall function element)))
 
 (defun stream-count (stream &key limit)
   "Return the number of elements in STREAM. LIMIT bounds the number of input
 elements accepted."
   (%validate-stream-limit limit "STREAM-COUNT")
-  (let ((count 0)
-        (current stream))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return count))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-COUNT" limit))
-        (incf count)
-        (setf current (cdr step))))))
+  (let ((count 0))
+    (do-stream (element stream :limit limit :caller "STREAM-COUNT" :on-end count)
+      (declare (ignore element))
+      (incf count))))
 
 (defun stream-first (stream &optional default)
   "Return the first element of STREAM, or DEFAULT when STREAM is empty."

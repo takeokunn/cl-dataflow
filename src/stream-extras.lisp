@@ -176,38 +176,21 @@ STREAM that share the same (FUNCALL FUNCTION ELEMENT) key (compared with EQUAL).
   "Return the sum of (FUNCALL KEY ELEMENT) over STREAM (0 for an empty stream).
 LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-SUM")
-  (let ((accumulator 0)
-        (current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return accumulator))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-SUM" limit))
-        (incf accumulator (funcall key (car step)))
-        (incf count)
-        (setf current (cdr step))))))
+  (let ((accumulator 0))
+    (do-stream (element stream :limit limit :caller "STREAM-SUM" :on-end accumulator)
+      (incf accumulator (funcall key element)))))
 
 (defun %stream-extreme (stream key compare default limit caller)
   (%validate-stream-limit limit caller)
-  (let ((current stream)
-        (best-element default)
+  (let ((best-element default)
         (best-key nil)
-        (found nil)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end)
-          (return best-element))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded caller limit))
-        (let ((candidate-key (funcall key (car step))))
-          (when (or (not found) (funcall compare candidate-key best-key))
-            (setf best-element (car step)
-                  best-key candidate-key
-                  found t)))
-        (incf count)
-        (setf current (cdr step))))))
+        (found nil))
+    (do-stream (element stream :limit limit :caller caller :on-end best-element)
+      (let ((candidate-key (funcall key element)))
+        (when (or (not found) (funcall compare candidate-key best-key))
+          (setf best-element element
+                best-key candidate-key
+                found t))))))
 
 (defun stream-min (stream &key (key #'identity) default limit)
   "Return the element of STREAM with the smallest (FUNCALL KEY ELEMENT), or DEFAULT
@@ -248,47 +231,23 @@ LIMIT bounds the number of input elements accepted."
   (multiple-value-bind (default limit)
       (%parse-stream-default-limit-options options "STREAM-FIND")
     (%validate-stream-limit limit "STREAM-FIND")
-    (let ((current stream)
-          (count 0))
-      (loop
-        (let ((step (%stream-step current)))
-          (when (eq step :end) (return default))
-          (when (and limit (= count limit))
-            (%signal-stream-limit-exceeded "STREAM-FIND" limit))
-          (when (funcall predicate (car step)) (return (car step)))
-          (incf count)
-          (setf current (cdr step)))))))
+    (do-stream (element stream :limit limit :caller "STREAM-FIND" :on-end default)
+      (when (funcall predicate element) (return element)))))
 
 (defun stream-some (predicate stream &key limit)
   "Return the first non-NIL (FUNCALL PREDICATE ELEMENT) over STREAM, or NIL.
 LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-SOME")
-  (let ((current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return nil))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-SOME" limit))
-        (let ((value (funcall predicate (car step))))
-          (when value (return value)))
-        (incf count)
-        (setf current (cdr step))))))
+  (do-stream (element stream :limit limit :caller "STREAM-SOME" :on-end nil)
+    (let ((value (funcall predicate element)))
+      (when value (return value)))))
 
 (defun stream-every (predicate stream &key limit)
   "Return true when every element of STREAM satisfies PREDICATE (true for empty).
 LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-EVERY")
-  (let ((current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return t))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-EVERY" limit))
-        (unless (funcall predicate (car step)) (return nil))
-        (incf count)
-        (setf current (cdr step))))))
+  (do-stream (element stream :limit limit :caller "STREAM-EVERY" :on-end t)
+    (unless (funcall predicate element) (return nil))))
 
 (defun stream-last (stream &rest options)
   "Return the last element of STREAM, or DEFAULT when STREAM is empty.
@@ -296,17 +255,9 @@ LIMIT bounds the number of input elements accepted."
   (multiple-value-bind (default limit)
       (%parse-stream-default-limit-options options "STREAM-LAST")
     (%validate-stream-limit limit "STREAM-LAST")
-    (let ((current stream)
-          (result default)
-          (count 0))
-      (loop
-        (let ((step (%stream-step current)))
-          (when (eq step :end) (return result))
-          (when (and limit (= count limit))
-            (%signal-stream-limit-exceeded "STREAM-LAST" limit))
-          (setf result (car step)
-                current (cdr step))
-          (incf count))))))
+    (let ((result default))
+      (do-stream (element stream :limit limit :caller "STREAM-LAST" :on-end result)
+        (setf result element)))))
 
 (defun stream-nth (n stream &optional default)
   "Return the Nth element (0-based) of STREAM, or DEFAULT when STREAM has fewer than

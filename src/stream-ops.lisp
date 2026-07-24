@@ -128,22 +128,15 @@ exceeded."
 accumulate (OLD-OR-NIL, PRESENT-P, ELEMENT) into each key's cell."
   (%validate-stream-limit limit caller)
   (let ((table (make-hash-table :test #'equal))
-        (order '())
-        (current stream)
-        (count 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return (values table (nreverse order))))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded caller limit))
-        (let ((key (funcall key-function (car step))))
-          (multiple-value-bind (existing present) (gethash key table)
-            (unless present
-              (push key order))
-            (setf (gethash key table)
-                  (funcall value-function existing present (car step)))))
-        (incf count)
-        (setf current (cdr step))))))
+        (order '()))
+    (do-stream (element stream :limit limit :caller caller
+                :on-end (values table (nreverse order)))
+      (let ((key (funcall key-function element)))
+        (multiple-value-bind (existing present) (gethash key table)
+          (unless present
+            (push key order))
+          (setf (gethash key table)
+                (funcall value-function existing present element)))))))
 
 (defun stream-group-by (function stream &key limit)
   "Return an alist (KEY . ELEMENTS) grouping STREAM's elements by (FUNCALL FUNCTION
@@ -220,14 +213,8 @@ empty."
 STREAM is empty. LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-AVERAGE")
   (let ((sum 0)
-        (count 0)
-        (current stream))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end)
-          (return (if (zerop count) nil (/ sum count))))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-AVERAGE" limit))
-        (incf sum (funcall key (car step)))
-        (incf count)
-        (setf current (cdr step))))))
+        (count 0))
+    (do-stream (element stream :limit limit :caller "STREAM-AVERAGE"
+                :on-end (if (zerop count) nil (/ sum count)))
+      (incf sum (funcall key element))
+      (incf count))))

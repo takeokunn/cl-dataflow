@@ -24,41 +24,27 @@ yields the empty stream."
   "Return the number of elements of STREAM that satisfy PREDICATE. LIMIT bounds
 the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-COUNT-IF")
-  (let ((count 0)
-        (seen 0)
-        (current stream))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end) (return count))
-        (when (and limit (= seen limit))
-          (%signal-stream-limit-exceeded "STREAM-COUNT-IF" limit))
-        (when (funcall predicate (car step)) (incf count))
-        (incf seen)
-        (setf current (cdr step))))))
+  (let ((count 0))
+    (do-stream (element stream :limit limit :caller "STREAM-COUNT-IF" :on-end count)
+      (when (funcall predicate element) (incf count)))))
 
 (defun stream-variance (stream &key (key #'identity) limit)
   "Return the population variance of (FUNCALL KEY ELEMENT) over STREAM, or NIL when
 STREAM is empty. LIMIT bounds the number of input elements accepted."
   (%validate-stream-limit limit "STREAM-VARIANCE")
-  (let ((current stream)
-        (count 0)
+  (let ((count 0)
         (mean 0)
         (m2 0))
-    (loop
-      (let ((step (%stream-step current)))
-        (when (eq step :end)
-          (return (if (zerop count) nil (/ m2 count))))
-        (when (and limit (= count limit))
-          (%signal-stream-limit-exceeded "STREAM-VARIANCE" limit))
-        (let* ((value (funcall key (car step)))
-               (new-count (1+ count))
-               (delta (- value mean))
-               (new-mean (+ mean (/ delta new-count)))
-               (delta2 (- value new-mean)))
-          (setf count new-count
-                mean new-mean
-                m2 (+ m2 (* delta delta2))))
-        (setf current (cdr step))))))
+    (do-stream (element stream :limit limit :caller "STREAM-VARIANCE"
+                :on-end (if (zerop count) nil (/ m2 count)))
+      (let* ((value (funcall key element))
+             (new-count (1+ count))
+             (delta (- value mean))
+             (new-mean (+ mean (/ delta new-count)))
+             (delta2 (- value new-mean)))
+        (setf count new-count
+              mean new-mean
+              m2 (+ m2 (* delta delta2)))))))
 
 (defun stream-stddev (stream &key (key #'identity) limit)
   "Return the population standard deviation of (FUNCALL KEY ELEMENT) over STREAM, or
