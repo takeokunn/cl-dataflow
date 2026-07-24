@@ -1,5 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; Pipeline construction (MAKE-PIPELINE, COPY-PIPELINE, the PIPELINE-STAGES
+;;;; setter) and RUN-PIPELINE's execution: driving each graph-ordered stage's
+;;;; node handler and folding the result into the context, continuation-
+;;;; passing style (%RUN-NODE/CPS, %RUN-PIPELINE-STAGES/CPS) so a stage's
+;;;; completion explicitly hands off to the next.
+
 (defun %build-pipeline-graph (graph stages)
   (cond
     (graph

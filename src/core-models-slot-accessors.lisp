@@ -1,5 +1,9 @@
 (in-package #:cl-dataflow)
 
+;;;; Per-slot public accessors for the model classes (event/effect/node/edge/
+;;;; transition/state-machine payload, metadata, and normalized-setter slots),
+;;;; declared in bulk via DEFINE-SLOT-APIS rather than hand-written per class.
+
 (defmethod context-effect-handlers ((context context))
   (%copy-effect-handlers (slot-value context 'effect-handlers)))
 

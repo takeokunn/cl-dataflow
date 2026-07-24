@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; Public copying accessors over GRAPH and CONTEXT: readers that never leak
+;;;; a live reference to internal state (GRAPH-NODES/GRAPH-EDGES,
+;;;; CONTEXT-EVENTS/CONTEXT-EFFECTS/CONTEXT-TRACE and their ordered/filtered
+;;;; variants), generated in bulk via DEFINE-SLOT-APIS.
+
 (defun graph-nodes (graph)
   ;; Readers verify structural integrity (ports, edge endpoints) but not
   ;; acyclicity: the old topological-sort on every read was O(V*E) Prolog work

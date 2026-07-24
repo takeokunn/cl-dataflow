@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; State-machine construction (MAKE-TRANSITION, MAKE-STATE-MACHINE,
+;;;; COPY-STATE-MACHINE) and the transition-selection internals
+;;;; (%FIND-TRANSITION-SELECTION, %TRANSITION-GUARD-SATISFIED-P) the CPS
+;;;; execution layer in state-machine-runtime-cps.lisp drives.
+
 (defun make-transition (from event-type to &key guard action metadata)
   (make-instance 'state-transition
                  :from (%normalize-name from)
@@ -110,12 +115,6 @@
   (and (string-equal (transition-from transition) (state-machine-state machine))
        (string-equal (transition-event-type transition) event-type)))
 
-(defun %matching-transitions (machine event-type)
-  "Every transition whose FROM state and EVENT-TYPE match MACHINE's current state."
-  (remove-if-not (lambda (transition)
-                   (%transition-matches-p transition machine event-type))
-                 (%state-machine-transitions-list machine)))
-
 (defun %transition-guard-satisfied-p (transition machine event context)
   (let ((guard (transition-guard transition)))
     (or (null guard)
@@ -131,16 +130,6 @@
              (unless first-match
                (setf first-match transition))
         finally (return (values nil first-match))))
-
-(defun %select-transition (machine event context matches)
-  "Return the first MATCH whose guard is absent or satisfied, else NIL.
-
-Guards are the mechanism for choosing among transitions that share the same
-FROM state and event, so a rejecting guard falls through to the next candidate
-instead of aborting the whole step."
-  (find-if (lambda (transition)
-             (%transition-guard-satisfied-p transition machine event context))
-           matches))
 
 (defun %transition-error-detail (machine event-type &optional (detail "No transition"))
   (format nil "~A from ~A on event ~A" detail

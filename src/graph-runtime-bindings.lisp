@@ -1,5 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; Resolves how values flow along pipeline edges at run time: turning a
+;;;; node's raw result into per-output-port bindings, collecting a node's
+;;;; per-input-port bindings from its incoming edges (newest edge wins a
+;;;; contested port), and collecting sink nodes' bindings into a pipeline's
+;;;; final result shape.
+
 (defun %node-output-bindings (node result)
   (let ((outputs (%node-outputs-list node)))
     (cond

@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; FLOW-NAME, FLOW-METADATA, and FLOW-KIND: one cross-type introspection
+;;;; protocol over every public flow object (node, edge, graph, context,
+;;;; event, effect, state-transition, state-machine, pipeline), generated
+;;;; from a per-type dispatch table via DEFINE-FLOW-DISPATCH.
+
 (defmacro define-flow-dispatch (name &body clauses)
   `(defun ,name (object)
      (typecase object

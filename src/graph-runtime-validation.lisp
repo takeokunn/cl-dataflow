@@ -1,5 +1,9 @@
 (in-package #:cl-dataflow)
 
+;;;; Graph mutation and structural validation: ADD-NODE/ADD-EDGE/FIND-NODE and
+;;;; the port/duplicate/missing-node checks VALIDATE-GRAPH and every mutator
+;;;; run before committing a change.
+
 (defun %signal-graph-error (graph detail)
   (error 'graph-error
           :graph graph

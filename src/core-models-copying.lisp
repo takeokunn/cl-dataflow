@@ -1,5 +1,13 @@
 (in-package #:cl-dataflow)
 
+;;;; DEFINE-COPY-INSTANCE(-WITH-CHECK) generate the %COPY-* deep-copy
+;;;; constructors for every model class (event, effect, node, edge, ...) from
+;;;; a per-slot copy-form list, keeping each class's copy logic declarative
+;;;; and next to the slots it touches instead of hand-written per class.
+;;;; %COPY-INSTANCE-SLOT-INITARGS needs :COMPILE-TOPLEVEL because both
+;;;; macros' expanders call it and this file uses those macros on itself, a
+;;;; few lines below.
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun %copy-instance-slot-initargs (slots)
     (mapcan (lambda (slot-spec)

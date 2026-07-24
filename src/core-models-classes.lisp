@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; The CLOS class definitions behind every public data model (NODE, EDGE,
+;;;; GRAPH, CONTEXT, EVENT, EFFECT, STATE-TRANSITION, STATE-MACHINE, PIPELINE)
+;;;; and their PRINT-OBJECT methods. Pure data: constructors, accessors, and
+;;;; copying logic live in the sibling core-models-*.lisp files.
+
 (defclass node ()
   ((name :initarg :name)
    (inputs :initarg :inputs)

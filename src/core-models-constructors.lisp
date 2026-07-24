@@ -1,5 +1,9 @@
 (in-package #:cl-dataflow)
 
+;;;; Public constructors (MAKE-NODE, MAKE-EDGE, MAKE-GRAPH, MAKE-CONTEXT) that
+;;;; normalize and copy their arguments so a constructed object never aliases
+;;;; caller-owned mutable data.
+
 (defun make-node (name &key inputs outputs handler metadata)
   (make-instance 'node
                  :name (%normalize-name name)

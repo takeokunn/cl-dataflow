@@ -1,5 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; The lowest-level slot-access primitives (%READ-SLOT and friends) plus
+;;;; DEFINE-SLOT-APIS/DEFINE-TYPE-PREDICATES, the two code-generating macros
+;;;; that every model accessor and type predicate in this library expands
+;;;; from -- the DSL "schema" data lives with each macro's call sites, not
+;;;; here.
+
 (defun %read-slot (object slot-name)
   (slot-value object slot-name))
 

@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; STEP-STATE-MACHINE's continuation-passing execution chain: resolve the
+;;;; matching transition, run its action, then commit the resulting state and
+;;;; history/trace records -- each phase named and explicitly handing off to
+;;;; the next via a CONTINUATION argument rather than a plain return.
+
 (defmacro %signal-state-machine-error (condition machine event-type detail &rest initargs)
   `(error ',condition
           :state (state-machine-state ,machine)

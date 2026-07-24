@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; The public state-machine stepping API: STEP-STATE-MACHINE and
+;;;; RUN-STATE-MACHINE (thin direct-style wrappers over the CPS machinery in
+;;;; state-machine-runtime-cps.lisp), transition introspection, and the node
+;;;; handler MAKE-STATE-MACHINE-NODE embeds a machine into a pipeline stage.
+
 (defun state-machine-available-transitions (machine &key (state (state-machine-state machine)))
   (let ((normalized-state (%normalize-name state)))
     (mapcar #'%copy-state-transition

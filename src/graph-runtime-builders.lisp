@@ -1,5 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; Building and remapping the graph backing a pipeline: mapping stage nodes
+;;;; back onto a (possibly copied) graph's own node instances, the
+;;;; PIPELINE-GRAPH/PIPELINE-METADATA setters, and %BUILD-SEQUENTIAL-GRAPH,
+;;;; which chains a bare list of stage specs into a linear graph when a
+;;;; pipeline is defined without an explicit graph.
+
 (defun %remap-pipeline-stages (graph stages)
   (mapcar (lambda (stage)
             (or (find-node graph (node-name stage))

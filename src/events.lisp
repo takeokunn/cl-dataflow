@@ -1,5 +1,10 @@
 (in-package #:cl-dataflow)
 
+;;;; Event construction and EMIT-EVENT, plus %PUSH-CONTEXT-TRACE-ENTRY: the
+;;;; single append point for a context's trace list that EMIT-EVENT,
+;;;; PERFORM-EFFECT, and state-machine transition recording all share, so
+;;;; TRACE-COUNT can never drift from (LENGTH TRACE).
+
 (defun %push-context-trace-entry (context entry)
   "The single append point for the context's trace list: EMIT-EVENT,
 PERFORM-EFFECT, and state-machine transition recording all go through this so

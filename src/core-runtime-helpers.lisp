@@ -1,5 +1,9 @@
 (in-package #:cl-dataflow)
 
+;;;; Small runtime helpers shared by the pipeline and testing layers: the
+;;;; context value store, runtime-context construction, and the
+;;;; %WITH-PLIST-BINDINGS macro used to destructure plist-shaped stage specs.
+
 (defun %store-value (context node-name port value)
   (setf (gethash (list node-name port) (%context-values-table context))
         (%copy-structured-value value)))

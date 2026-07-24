@@ -1,5 +1,9 @@
 (in-package #:cl-dataflow)
 
+;;;; Topological ordering and boundary queries: TOPOLOGICAL-SORT (Kahn's
+;;;; algorithm, iterative) and GRAPH-SOURCE-NODES/GRAPH-SINK-NODES, all
+;;;; reading from a single adjacency snapshot instead of a per-node query.
+
 (defun %incoming-edges (graph node-name)
   (remove-if-not (lambda (edge)
                     (equal (edge-to edge) node-name))

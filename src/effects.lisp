@@ -1,5 +1,9 @@
 (in-package #:cl-dataflow)
 
+;;;; The effect boundary's core: constructing an EFFECT and PERFORM-EFFECT,
+;;;; which looks up the type's registered handler, runs it, and records the
+;;;; result into the context's effect list and trace.
+
 (defun make-effect (type &key payload metadata trace-index result)
   (make-instance 'effect
                  :type (%normalize-name type)

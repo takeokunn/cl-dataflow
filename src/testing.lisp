@@ -1,5 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; Test-support helpers for asserting on a completed pipeline/state-machine
+;;;; run: RUN-PIPELINE-WITH-TEST-CONTEXT builds a fresh runtime context, and
+;;;; the ASSERT-* helpers (generated via %DEFINE-ASSERTION) each check one
+;;;; observable facet -- emitted events, performed effects, final state, and
+;;;; pipeline result -- against an expected value.
+
 (defun %normalize-expected-list (value)
   (if (listp value) value (list value)))
 
