@@ -1,12 +1,11 @@
 (in-package #:cl-dataflow)
 
-(defun %node-output-bindings (node result)
-  (let ((outputs (%node-outputs-list node)))
-    (cond
-      ((null outputs) '())
-      ((%single-output-scalar-result-p outputs result)
-        (%scalar-output-binding outputs result))
-      (t (%normalize-output-structure result outputs)))))
+(defun %node-output-bindings (node result &optional (outputs (%node-outputs-list node)))
+  (cond
+    ((null outputs) (quote ()))
+    ((%single-output-scalar-result-p outputs result)
+      (%scalar-output-binding outputs result))
+    (t (%normalize-output-structure result outputs))))
 
 (defun %binding-list-p (value)
   (and (listp value) (or (null value) (every #'consp value))))
@@ -42,14 +41,18 @@ insertion order silently deciding it the other way."
           when edge
             collect (cons port edge))))
 
-(defun %resolve-input-binding-plan (context binding-plan)
-  (loop for (port . edge) in binding-plan
-        collect (cons port (%read-value context (edge-from edge) (edge-from-port edge)))))
+(progn
+  (defun %resolve-input-binding-plan (context binding-plan)
+    (loop for (port . edge) in binding-plan
+          collect (cons port (%read-value context (edge-from edge) (edge-from-port edge)))))
+  (defun %incoming-edge-bindings (context node incoming-edges)
+    (%resolve-input-binding-plan
+      context
+      (%node-input-binding-plan node incoming-edges))))
 
-(defun %incoming-edge-bindings (context node incoming-edges)
-  (%resolve-input-binding-plan
-    context
-    (%node-input-binding-plan node incoming-edges)))
+(defun %resolve-input-key-plan (context binding-plan)
+  (loop for (port . key) in binding-plan
+        collect (cons port (%read-value-by-key context key))))
 
 (defun %collect-node-inputs (context graph node input &optional incoming-index)
   (let ((incoming
@@ -79,16 +82,28 @@ insertion order silently deciding it the other way."
                       (null (gethash (node-name node) successors)))
                     order)))
 
-(defun %collect-cached-sink-results (context sink-nodes)
+(defun %collect-cached-sink-results (context sink-result-plans)
   (let ((sinks
         (mapcar
-          (lambda (node)
-            (%sink-result-entry context node))
-          sink-nodes)))
+          (lambda (sink-plan)
+            (cons
+              (car sink-plan)
+              (loop for (port . key) in (cdr sink-plan)
+                    collect (cons port (%read-value-by-key context key)))))
+          sink-result-plans)))
     (cond
       ((null sinks) nil)
       ((= (length sinks) 1) (%collapse-single-sink-result (first sinks)))
       (t sinks))))
 
 (defun %collect-sink-results (graph context order)
-  (%collect-cached-sink-results context (%sink-nodes-in-order graph order)))
+  (let ((sink-nodes (%sink-nodes-in-order graph order)))
+    (let ((sinks
+          (mapcar
+            (lambda (node)
+              (%sink-result-entry context node))
+            sink-nodes)))
+      (cond
+        ((null sinks) nil)
+        ((= (length sinks) 1) (%collapse-single-sink-result (first sinks)))
+        (t sinks)))))

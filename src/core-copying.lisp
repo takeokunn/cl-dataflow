@@ -65,7 +65,15 @@
     value))
 
 (defun %copy-result-table (table)
-  (%copy-hash-table-with-value-transform table #'%copy-structured-value))
+  (let ((copy
+        (make-hash-table :test (hash-table-test table) :size (hash-table-count table))))
+    (maphash
+      (lambda (key value)
+        (setf
+          (gethash (%copy-structured-value key) copy)
+          (%copy-structured-value value)))
+      table)
+    copy))
 
 (defun %copy-effect-handlers (effect-handlers)
   (let ((copy (make-hash-table :test #'equal :size (hash-table-count effect-handlers))))

@@ -9,44 +9,109 @@
             copied-graph
             (%remap-pipeline-stages copied-graph (or stages (topological-sort graph))))))
       (stages (%build-sequential-graph stages))
-      (t (values (make-graph) '()))))
+      (t (values (make-graph) (quote ())))))
   (defun %copy-pipeline-stage-ports (ports)
     (mapcar (function copy-seq) ports))
   (defun %make-pipeline-stage-signature (stage)
     (make-instance
       (quote pipeline-stage-signature)
-      :node stage
-      :name (copy-seq (node-name stage))
-      :inputs (%copy-pipeline-stage-ports (%node-inputs-list stage))
-      :outputs (%copy-pipeline-stage-ports (%node-outputs-list stage))))
+      :node
+      stage
+      :name
+      (copy-seq (node-name stage))
+      :inputs
+      (%copy-pipeline-stage-ports (%node-inputs-list stage))
+      :outputs
+      (%copy-pipeline-stage-ports (%node-outputs-list stage))))
   (defun %make-pipeline-edge-signature (edge)
     (make-instance
       (quote pipeline-edge-signature)
-      :edge edge
-      :from (%copy-structured-value (edge-from edge))
-      :from-port (%copy-structured-value (edge-from-port edge))
-      :to (%copy-structured-value (edge-to edge))
-      :to-port (%copy-structured-value (edge-to-port edge))))
-  (defun %make-pipeline-execution-plan (graph stages)
-  (let ((incoming-index (%incoming-edges-index graph)))
-    (make-instance
-      (quote pipeline-execution-plan)
-      :graph graph
-      :stages stages
-      :stage-signatures
-      (loop for stage in stages
-            collect (%make-pipeline-stage-signature stage))
-      :incoming-index incoming-index
-      :input-binding-plans
-      (loop for node in stages
-            for incoming-edges = (gethash (node-name node) incoming-index)
+      :edge
+      edge
+      :from
+      (%copy-structured-value (edge-from edge))
+      :from-port
+      (%copy-structured-value (edge-from-port edge))
+      :to
+      (%copy-structured-value (edge-to edge))
+      :to-port
+      (%copy-structured-value (edge-to-port edge))))
+  (defun %pipeline-value-key (name port)
+    (list name port))
+  (defun %pipeline-output-key-plan (signature)
+    (loop with name = (%pipeline-stage-signature-name signature)
+          for port in (%pipeline-stage-signature-outputs signature)
+          collect (cons port (%pipeline-value-key name port))))
+  (defun %pipeline-input-key-plan (binding-plan target-signature edge-signatures)
+    (cons
+      (car binding-plan)
+      (loop for (target-port . edge) in (cdr binding-plan)
+            for edge-signature = (find
+          edge
+          edge-signatures
+          :key
+          (function %pipeline-edge-signature-edge)
+          :test
+          (function eq))
+            for private-target-port = (find
+          target-port
+          (%pipeline-stage-signature-inputs target-signature)
+          :test
+          (function equal))
             collect (cons
-                      (not (endp incoming-edges))
-                      (%node-input-binding-plan node incoming-edges)))
-      :sinks (%sink-nodes-in-order graph stages)
-      :edge-signatures
-      (loop for edge in (%graph-edges-list graph)
-            collect (%make-pipeline-edge-signature edge)))))
+          private-target-port
+          (%pipeline-value-key
+            (%pipeline-edge-signature-from edge-signature)
+            (%pipeline-edge-signature-from-port edge-signature))))))
+  (defun %pipeline-sink-result-plan (sink stage-signatures output-key-plans)
+    (loop for signature in stage-signatures
+          for output-key-plan in output-key-plans
+          when (eq sink (%pipeline-stage-signature-node signature))
+            return (cons (%pipeline-stage-signature-name signature) output-key-plan)))
+  (defun %make-pipeline-execution-plan (graph stages)
+    (let* ((incoming-index (%incoming-edges-index graph))
+            (stage-signatures
+          (loop for stage in stages
+                collect (%make-pipeline-stage-signature stage)))
+            (edge-signatures
+          (loop for edge in (%graph-edges-list graph)
+                collect (%make-pipeline-edge-signature edge)))
+            (input-binding-plans
+          (loop for node in stages
+                for incoming-edges = (gethash (node-name node) incoming-index)
+                collect (cons
+              (not (endp incoming-edges))
+              (%node-input-binding-plan node incoming-edges))))
+            (input-key-plans
+          (loop for binding-plan in input-binding-plans
+                for signature in stage-signatures
+                collect (%pipeline-input-key-plan binding-plan signature edge-signatures)))
+            (output-key-plans
+          (mapcar (function %pipeline-output-key-plan) stage-signatures))
+            (sinks (%sink-nodes-in-order graph stages)))
+      (make-instance
+        (quote pipeline-execution-plan)
+        :graph
+        graph
+        :stages
+        stages
+        :stage-signatures
+        stage-signatures
+        :incoming-index
+        incoming-index
+        :input-binding-plans
+        input-binding-plans
+        :input-key-plans
+        input-key-plans
+        :output-key-plans
+        output-key-plans
+        :sinks
+        sinks
+        :sink-result-plans
+        (loop for sink in sinks
+              collect (%pipeline-sink-result-plan sink stage-signatures output-key-plans))
+        :edge-signatures
+        edge-signatures)))
   (defun %pipeline-edge-signature-current-p (edge signature)
     (and
       (eq edge (%pipeline-edge-signature-edge signature))
@@ -62,49 +127,50 @@
       (equal (%node-outputs-list stage) (%pipeline-stage-signature-outputs signature))
       (eq stage (find-node graph (node-name stage)))))
   (defun %pipeline-stage-signatures-current-p (graph stages signatures)
-  (do ((remaining-stages stages (cdr remaining-stages))
-      (remaining-signatures signatures (cdr remaining-signatures)))
-    ((or (endp remaining-stages) (endp remaining-signatures))
-      (and (endp remaining-stages) (endp remaining-signatures)))
-    (unless (%pipeline-stage-signature-current-p
-        graph
-        (car remaining-stages)
-        (car remaining-signatures))
-      (return nil))))
-  (defun %pipeline-edge-signatures-current-p (edges signatures)
-  (do ((remaining-edges edges (cdr remaining-edges))
-      (remaining-signatures signatures (cdr remaining-signatures)))
-    ((or (endp remaining-edges) (endp remaining-signatures))
-      (and (endp remaining-edges) (endp remaining-signatures)))
-    (unless (%pipeline-edge-signature-current-p
-        (car remaining-edges)
-        (car remaining-signatures))
-      (return nil))))
-  (defun %pipeline-execution-plan-current-p (pipeline plan)
-  (and
-    plan
-    (let ((graph (pipeline-graph pipeline)))
-      (and
-        (eq graph (%pipeline-execution-plan-graph plan))
-        (%pipeline-stage-signatures-current-p
+    (do ((remaining-stages stages (cdr remaining-stages))
+          (remaining-signatures signatures (cdr remaining-signatures)))
+      ((or (endp remaining-stages) (endp remaining-signatures))
+        (and (endp remaining-stages) (endp remaining-signatures)))
+      (unless (%pipeline-stage-signature-current-p
           graph
-          (%pipeline-execution-plan-stages plan)
-          (%pipeline-execution-plan-stage-signatures plan))
-        (%pipeline-edge-signatures-current-p
-          (%graph-edges-list graph)
-          (%pipeline-execution-plan-edge-signatures plan))))))
+          (car remaining-stages)
+          (car remaining-signatures))
+        (return nil))))
+  (defun %pipeline-edge-signatures-current-p (edges signatures)
+    (do ((remaining-edges edges (cdr remaining-edges))
+          (remaining-signatures signatures (cdr remaining-signatures)))
+      ((or (endp remaining-edges) (endp remaining-signatures))
+        (and (endp remaining-edges) (endp remaining-signatures)))
+      (unless (%pipeline-edge-signature-current-p
+          (car remaining-edges)
+          (car remaining-signatures))
+        (return nil))))
+  (defun %pipeline-execution-plan-current-p (pipeline plan)
+    (and
+      plan
+      (let ((graph (pipeline-graph pipeline)))
+        (and
+          (eq graph (%pipeline-execution-plan-graph plan))
+          (%pipeline-stage-signatures-current-p
+            graph
+            (%pipeline-execution-plan-stages plan)
+            (%pipeline-execution-plan-stage-signatures plan))
+          (%pipeline-edge-signatures-current-p
+            (%graph-edges-list graph)
+            (%pipeline-execution-plan-edge-signatures plan))))))
   (defun %rebuild-pipeline-execution-plan (pipeline)
     (let* ((graph (pipeline-graph pipeline))
             (stages (%remap-pipeline-stages graph (%pipeline-stages-list pipeline)))
             (plan (%make-pipeline-execution-plan graph stages)))
-      (setf (slot-value pipeline 'stages) stages
+      (setf (slot-value pipeline (quote stages)) stages
             (%pipeline-execution-plan pipeline) plan)
       plan))
   (defun %ensure-pipeline-execution-plan (pipeline)
     (let ((plan (%pipeline-execution-plan pipeline)))
       (if (%pipeline-execution-plan-current-p pipeline plan) plan
         (%rebuild-pipeline-execution-plan pipeline)))))
-  (defun make-pipeline (&key graph stages metadata)
+
+(defun make-pipeline (&key graph stages metadata)
   (multiple-value-bind (resolved-graph resolved-stages) (%build-pipeline-graph graph stages)
     (validate-graph resolved-graph)
     (let ((internal-stages (copy-list resolved-stages)))
@@ -156,66 +222,76 @@
     :output
     (%copy-node-output-bindings bindings)))
 
-(defun %record-node-run (context node node-input bindings)
-  (dolist (binding bindings)
-    (%store-value context (node-name node) (car binding) (cdr binding)))
+(defun %record-node-run (context node node-input bindings output-key-plan)
+  (loop for binding in bindings
+        for key-binding = (assoc (car binding) output-key-plan :test #'string-equal)
+        do (%store-value-by-key context (cdr key-binding) (cdr binding)))
   (%push-context-trace-entry
     context
     (%make-node-trace-record node node-input bindings)))
 
-(defun %run-node/cps (context node input input-binding-plan continuation)
-  (let* ((has-incoming-p (car input-binding-plan))
-          (bindings (cdr input-binding-plan))
+(defun %run-node/cps (context node input input-key-plan output-key-plan continuation)
+  (let* ((has-incoming-p (car input-key-plan))
+          (bindings (cdr input-key-plan))
           (node-input
-            (cond
-              ((null bindings)
-              (if has-incoming-p nil (%node-input-binding node input)))
-              ((null (cdr bindings))
-              (let ((edge (cdar bindings)))
-                (%read-value context (edge-from edge) (edge-from-port edge))))
-              (t
-              (%collapse-single-binding-list
-                (%resolve-input-binding-plan context bindings)))))
+        (cond
+          ((null bindings)
+            (if has-incoming-p nil
+              (%node-input-binding node input)))
+          ((null (cdr bindings)) (%read-value-by-key context (cdar bindings)))
+          (t (%collapse-single-binding-list (%resolve-input-key-plan context bindings)))))
           (output (funcall (node-handler node) node-input context))
-          (output-bindings (%node-output-bindings node output)))
-    (%record-node-run context node node-input output-bindings)
+          (output-bindings
+        (%node-output-bindings node output (mapcar (function car) output-key-plan))))
+    (%record-node-run context node node-input output-bindings output-key-plan)
     (funcall continuation output)))
 
-(defun %finalize-pipeline-run (context sink-nodes)
-  (setf (context-result context) (%collect-cached-sink-results context sink-nodes))
+(defun %finalize-pipeline-run (context sink-result-plans)
+  (setf (context-result context) (%collect-cached-sink-results context sink-result-plans))
   (context-result context))
 
-(defun %ensure-pipeline-context (context)
-  (or context (make-context)))
-
-(defun %run-pipeline-stages/cps (context order sink-nodes input input-binding-plans continuation)
-  (labels ((advance-stages (remaining remaining-binding-plans)
-              (if (endp remaining) (funcall continuation (%finalize-pipeline-run context sink-nodes))
+(defun %run-pipeline-stages/cps (context
+    order
+    sink-result-plans
+    input
+    input-key-plans
+    output-key-plans
+    continuation)
+  (labels ((advance-stages (remaining remaining-input-key-plans remaining-output-key-plans)
+              (if (endp remaining) (funcall continuation (%finalize-pipeline-run context sink-result-plans))
           (%run-node/cps
             context
             (first remaining)
             input
-            (first remaining-binding-plans)
+            (first remaining-input-key-plans)
+            (first remaining-output-key-plans)
             (lambda (output)
               (declare (ignore output))
-              (advance-stages (rest remaining) (rest remaining-binding-plans)))))))
-    (advance-stages order input-binding-plans)))
+              (advance-stages
+                (rest remaining)
+                (rest remaining-input-key-plans)
+                (rest remaining-output-key-plans)))))))
+    (advance-stages order input-key-plans output-key-plans)))
 
-(defun run-pipeline (pipeline &key input context)
-  (let* ((plan (%ensure-pipeline-execution-plan pipeline))
-          (ctx (%ensure-pipeline-context context))
-          (order (%pipeline-execution-plan-stages plan))
-          (sink-nodes (%pipeline-execution-plan-sinks plan))
-          (input-binding-plans (%pipeline-execution-plan-input-binding-plans plan)))
-    (%run-pipeline-stages/cps
-      ctx
-      order
-      sink-nodes
-      input
-      input-binding-plans
-      (lambda (result)
-        result))))
-
-(defun run-pipeline-with-context (pipeline &key input context)
-  (let ((ctx (%ensure-pipeline-context context)))
-    (values (run-pipeline pipeline :input input :context ctx) ctx)))
+(progn
+  (defun %ensure-pipeline-context (context)
+    (or context (make-context)))
+  (defun run-pipeline (pipeline &key input context)
+    (let* ((plan (%ensure-pipeline-execution-plan pipeline))
+            (ctx (%ensure-pipeline-context context))
+            (order (%pipeline-execution-plan-stages plan))
+            (sink-result-plans (%pipeline-execution-plan-sink-result-plans plan))
+            (input-key-plans (%pipeline-execution-plan-input-key-plans plan))
+            (output-key-plans (%pipeline-execution-plan-output-key-plans plan)))
+      (%run-pipeline-stages/cps
+        ctx
+        order
+        sink-result-plans
+        input
+        input-key-plans
+        output-key-plans
+        (lambda (result)
+          result))))
+  (defun run-pipeline-with-context (pipeline &key input context)
+    (let ((ctx (%ensure-pipeline-context context)))
+      (values (run-pipeline pipeline :input input :context ctx) ctx))))

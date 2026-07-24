@@ -79,18 +79,41 @@
     ((graph :initarg :graph :reader %pipeline-execution-plan-graph)
       (stages :initarg :stages :reader %pipeline-execution-plan-stages)
       (stage-signatures
-        :initarg :stage-signatures
-        :reader %pipeline-execution-plan-stage-signatures)
+        :initarg
+        :stage-signatures
+        :reader
+        %pipeline-execution-plan-stage-signatures)
       (incoming-index
-        :initarg :incoming-index
-        :reader %pipeline-execution-plan-incoming-index)
+        :initarg
+        :incoming-index
+        :reader
+        %pipeline-execution-plan-incoming-index)
       (input-binding-plans
-        :initarg :input-binding-plans
-        :reader %pipeline-execution-plan-input-binding-plans)
+        :initarg
+        :input-binding-plans
+        :reader
+        %pipeline-execution-plan-input-binding-plans)
+      (input-key-plans
+        :initarg
+        :input-key-plans
+        :reader
+        %pipeline-execution-plan-input-key-plans)
+      (output-key-plans
+        :initarg
+        :output-key-plans
+        :reader
+        %pipeline-execution-plan-output-key-plans)
       (sinks :initarg :sinks :reader %pipeline-execution-plan-sinks)
+      (sink-result-plans
+        :initarg
+        :sink-result-plans
+        :reader
+        %pipeline-execution-plan-sink-result-plans)
       (edge-signatures
-        :initarg :edge-signatures
-        :reader %pipeline-execution-plan-edge-signatures)))
+        :initarg
+        :edge-signatures
+        :reader
+        %pipeline-execution-plan-edge-signatures)))
   (defclass pipeline ()
     ((graph :initarg :graph)
       (stages :initarg :stages :initform '())
