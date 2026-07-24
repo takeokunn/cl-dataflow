@@ -1,7 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; Normalization helpers shared across the model and runtime layers: name
+;;;; and metadata canonicalization, port-list dedup/defaulting, and the
+;;;; structured-input/output shape conversions pipeline node bindings use.
+
 (defun %normalize-name (value)
-  (etypecase value
+  (typecase value
     (string value)
     (symbol (symbol-name value))
     ;; Non-symbol designators (numbers, characters, ...) are stringified with a
@@ -47,35 +51,35 @@
         (nth (1+ position) plist)
         default)))
 
-(defun %normalize-port-alist (value ports)
+(defun %classify-structured-value (value)
   (cond
-    ((hash-table-p value)
+    ((hash-table-p value) :hash-table)
+    ((and (listp value) (every #'consp value)) :alist)
+    ((and (listp value) (evenp (length value))) :plist)
+    (t :scalar)))
+
+(defun %normalize-port-alist (value ports)
+  (ecase (%classify-structured-value value)
+    (:hash-table
      (loop for port in ports
            collect (cons port (gethash port value))))
-    ((and (listp value) (every #'consp value))
+    (:alist
      (loop for port in ports
            for cell = (assoc port value :test #'equal)
            collect (cons port (and cell (cdr cell)))))
-    ((and (listp value) (evenp (length value)))
+    (:plist
      (loop for (key val) on value by #'cddr
-           collect (cons (%normalize-name key) val)))
-    (t nil)))
+           collect (cons (%normalize-name key) val)))))
 
 (defun %structured-value-p (value)
-  (or (hash-table-p value)
-      (and (listp value) (every #'consp value))
-      (and (listp value) (evenp (length value)))))
+  (not (eq (%classify-structured-value value) :scalar)))
 
 (defun %normalize-single-port-structure (value ports)
   (let ((first-port (first ports)))
-    (cond
-      ((hash-table-p value)
-       (gethash first-port value))
-      ((and (listp value) (every #'consp value))
-       (cdr (assoc first-port value :test #'equal)))
-      ((and (listp value) (evenp (length value)))
-       (%plist-value value first-port))
-      (t value))))
+    (ecase (%classify-structured-value value)
+      (:hash-table (gethash first-port value))
+      (:alist (cdr (assoc first-port value :test #'equal)))
+      (:plist (%plist-value value first-port)))))
 
 (defun %normalize-structured-input (value ports)
   (let ((port-count (length ports)))

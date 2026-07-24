@@ -89,6 +89,17 @@ GRAPH-A's). Neither input is modified."
         (%readd-edge result edge)))
     result))
 
+(defun %contract-edge-redirect (edge to-name from-name from-out from-in)
+  "Return (VALUES NEW-FROM NEW-FROM-PORT NEW-TO NEW-TO-PORT) for EDGE after
+merging TO-NAME into FROM-NAME: an endpoint at TO-NAME redirects to FROM-NAME,
+attaching at FROM-NAME's first output/input port (FROM-OUT/FROM-IN)."
+  (let* ((from-changed (equal (edge-from edge) to-name))
+         (to-changed (equal (edge-to edge) to-name)))
+    (values (if from-changed from-name (edge-from edge))
+            (if from-changed from-out (edge-from-port edge))
+            (if to-changed from-name (edge-to edge))
+            (if to-changed from-in (edge-to-port edge)))))
+
 (defun graph-contract-edge (graph from to)
   "Return a new graph with node TO merged into node FROM: every edge incident to TO
 is redirected to FROM (a redirected endpoint attaches to FROM's first port), edges
@@ -114,12 +125,8 @@ nodes; signals INVALID-INPUT-ERROR otherwise. GRAPH is not modified."
         (unless (equal name to-name)
           (add-node result (%copy-node-snapshot (gethash name nodes)))))
       (dolist (edge (reverse (%graph-edges-list graph)))
-        (let* ((from-changed (equal (edge-from edge) to-name))
-               (to-changed (equal (edge-to edge) to-name))
-               (new-from (if from-changed from-name (edge-from edge)))
-               (new-to (if to-changed from-name (edge-to edge)))
-               (new-from-port (if from-changed from-out (edge-from-port edge)))
-               (new-to-port (if to-changed from-in (edge-to-port edge))))
+        (multiple-value-bind (new-from new-from-port new-to new-to-port)
+            (%contract-edge-redirect edge to-name from-name from-out from-in)
           (unless (equal new-from new-to)
             (let ((key (%edge-identity-key new-from new-from-port new-to new-to-port)))
               (unless (gethash key seen)

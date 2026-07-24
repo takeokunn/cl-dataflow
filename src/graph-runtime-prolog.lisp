@@ -1,5 +1,11 @@
 (in-package #:cl-dataflow)
 
+;;;; cl-prolog-backed graph traversal: the node/edge relation is materialized
+;;;; into a rulebase and read with one bulk QUERY-PROLOG call per traversal
+;;;; (not one query per node), then walked in pure Lisp -- GRAPH-REACHABLE-P,
+;;;; GRAPH-PATH, GRAPH-ANCESTORS, and GRAPH-DESCENDANTS all stay linear and
+;;;; stack-safe on deep or cyclic graphs.
+
 (defparameter +graph-node-predicate+ 'graph-node)
 (defparameter +graph-edge-predicate+ 'graph-edge)
 
@@ -102,18 +108,17 @@ from). Distinct (from . to) pairs are counted once."
                 (declare (ignore node))
                 (setf (gethash name adjacency) '()))
               (%graph-nodes-table graph))
-    (when (%graph-edges-list graph)
-      (dolist (solution (cl-prolog:query-prolog
-                          rulebase
-                          (list +graph-edge-predicate+ '?from '?to)))
-        (let* ((from (cl-prolog:solution-binding '?from solution))
-                (to (cl-prolog:solution-binding '?to solution))
-                (pair (cons from to)))
-          (unless (gethash pair seen-pairs)
-            (setf (gethash pair seen-pairs) t)
-            (ecase direction
-              (:successors (push to (gethash from adjacency)))
-              (:predecessors (push from (gethash to adjacency))))))))
+    (dolist (solution (cl-prolog:query-prolog
+                        rulebase
+                        (list +graph-edge-predicate+ '?from '?to)))
+      (let* ((from (cl-prolog:solution-binding '?from solution))
+              (to (cl-prolog:solution-binding '?to solution))
+              (pair (cons from to)))
+        (unless (gethash pair seen-pairs)
+          (setf (gethash pair seen-pairs) t)
+          (ecase direction
+            (:successors (push to (gethash from adjacency)))
+            (:predecessors (push from (gethash to adjacency)))))))
     (maphash (lambda (name neighbors)
                 (setf (gethash name adjacency) (sort neighbors #'string<)))
               adjacency)
@@ -190,11 +195,13 @@ only through a cycle)."
             (parent (make-hash-table :test #'equal))
             (enqueued (make-hash-table :test #'equal))
             (frontier '()))
+        ;; SUCCESSORS is already deduped per name by %GRAPH-ADJACENCY's
+        ;; SEEN-PAIRS, so no name here can repeat and an ENQUEUED guard would
+        ;; never trigger.
         (dolist (successor (gethash from-name successors))
-          (unless (gethash successor enqueued)
-            (setf (gethash successor enqueued) t
-                  (gethash successor parent) from-name)
-            (push successor frontier)))
+          (setf (gethash successor enqueued) t
+                (gethash successor parent) from-name)
+          (push successor frontier))
         (setf frontier (nreverse frontier))
         (when (gethash to-name parent)
           (return-from graph-path (%reconstruct-path parent from-name to-name)))
@@ -209,6 +216,4 @@ only through a cycle)."
                     (return-from graph-path
                       (%reconstruct-path parent from-name to-name)))
                   (push successor next))))
-            (setf frontier (nreverse next))))
-        (when (gethash to-name parent)
-          (%reconstruct-path parent from-name to-name))))))
+            (setf frontier (nreverse next))))))))

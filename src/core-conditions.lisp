@@ -1,5 +1,35 @@
 (in-package #:cl-dataflow)
 
+;;;; Condition types for every error this library signals (input validation,
+;;;; graph structure, missing effect handlers, invalid transitions, guard
+;;;; failures) and the shared detail-report formatting they use.
+
+(declaim (notinline %copy-structured-value
+                    %copy-node-snapshot
+                    %copy-edge-snapshot
+                    %copy-graph-snapshot
+                    %copy-event
+                    %copy-effect
+                    graph-nodes
+                    graph-edges
+                    graph-metadata
+                    context-values
+                    context-events
+                    context-effects
+                    context-trace
+                    context-metadata
+                    context-effect-handlers
+                    context-result
+                    context-state
+                    event-type
+                    event-payload
+                    event-metadata
+                    event-trace-index
+                    effect-type
+                    effect-payload
+                    effect-metadata
+                    effect-trace-index))
+
 (define-condition cl-dataflow-error (error) ())
 
 (defun %write-condition-detail-report (condition stream detail-reader)
