@@ -159,9 +159,9 @@
 (defun %record-node-run (context node node-input bindings)
   (dolist (binding bindings)
     (%store-value context (node-name node) (car binding) (cdr binding)))
-  (push
-    (%make-node-trace-record node node-input bindings)
-    (%context-trace-list context)))
+  (%push-context-trace-entry
+    context
+    (%make-node-trace-record node node-input bindings)))
 
 (defun %run-node/cps (context node input input-binding-plan continuation)
   (let* ((has-incoming-p (car input-binding-plan))

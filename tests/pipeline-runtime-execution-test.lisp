@@ -55,3 +55,55 @@
     (add-edge graph older sink)
     (add-edge graph newer sink)
     (is (= (run-pipeline (make-pipeline :graph graph)) 2))))
+
+(deftest
+  pipeline-interleaves-node-event-and-effect-trace-indices
+  (let (emitted
+        performed)
+    (with-effect-handlers
+        (handlers
+          "audit"
+          (lambda (effect context)
+            (declare (ignore effect context))
+            :handled))
+      (let* ((source
+          (make-node
+            "source"
+            :outputs
+            (list "value")
+            :handler
+            (lambda (input context)
+              (declare (ignore input context))
+              :value)))
+            (sink
+          (make-node
+            "sink"
+            :inputs
+            (list "value")
+            :outputs
+            (list "result")
+            :handler
+            (lambda (input context)
+              (declare (ignore input))
+              (setf emitted (emit-event context "observed"))
+              (setf performed (perform-effect context "audit"))
+              :done)))
+            (pipeline (make-pipeline :stages (list source sink)))
+            (context (make-context :effect-handlers handlers)))
+        (run-pipeline pipeline :context context)
+        (let ((trace (context-trace-in-order context)))
+          (is
+            (equal
+              (mapcar (function cl-dataflow::%trace-entry-kind) trace)
+              (quote (:node :event :effect :node))))
+          (is (= (event-trace-index emitted) 1))
+          (is (= (effect-trace-index performed) 2))
+          (is (= (getf (second trace) :trace-index) 1))
+          (is (= (getf (third trace) :trace-index) 2))
+          (is (= (cl-dataflow::%context-trace-count context) 4))
+          (is (= (length (cl-dataflow::%context-trace-list context)) 4)))
+        (run-pipeline pipeline :context context)
+        (is (= (event-trace-index emitted) 5))
+        (is (= (effect-trace-index performed) 6))
+        (is (= (cl-dataflow::%context-trace-count context) 8))
+        (is (= (length (cl-dataflow::%context-trace-list context)) 8))))))
